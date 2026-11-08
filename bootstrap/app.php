@@ -40,7 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($request->is('admin') || $request->is('admin/*')) {
-                return redirect('/admin/login');
+                return redirect('/admin/login')->withErrors([
+                    'username' => 'Сессия истекла. Обновите страницу и войдите снова.',
+                ]);
             }
 
             if ($request->is('api/*') || $request->is('v1/*') || $request->expectsJson()) {
