@@ -186,6 +186,15 @@ php artisan mcp:start knowledge
 
 Подробнее: [docs/mcp.md](docs/mcp.md).
 
+### DeepSeek Harness
+
+DSH подключается двумя блоками в `~/.dsh/profiles/<profile>/cordis.patch.yml`:
+кастомный OpenAI-провайдер `neiro-brain` (base URL `http://127.0.0.1/v1`) и
+MCP-сервер `neiro-brain` (`http://127.0.0.1/mcp/knowledge`). Модель в UI —
+`Neiro Brain (DeepSeek)` → `deepseek-flash`.
+
+Пошагово и готовый YAML: [docs/deepseek-harness.md](docs/deepseek-harness.md).
+
 ## Как работает BM25
 
 Для каждого чанка `D` и терма запроса `q`:
@@ -348,7 +357,7 @@ app/
   Services/Connectors/   JSONL, ChatGPT export, Markdown
   Services/Proxy/        upstream, mock, конфиг
   Settings/              настройки и инициализация
-docs/                    архитектура, MCP, прокси, API, эксплуатация
+docs/                    архитектура, MCP, прокси, API, эксплуатация, OpenServer
 scripts/                 планировщик для Windows
 ```
 
