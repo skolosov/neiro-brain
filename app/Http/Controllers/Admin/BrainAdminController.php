@@ -76,7 +76,6 @@ class BrainAdminController extends Controller
             'proxy_base_url' => ['nullable', 'string', 'max:255'],
             'proxy_api_key' => ['nullable', 'string', 'max:512'],
             'proxy_access_token' => ['nullable', 'string', 'max:255'],
-            'proxy_model' => ['required', 'string', 'max:128'],
             'proxy_inject_memory' => ['nullable', 'boolean'],
             'proxy_capture' => ['nullable', 'boolean'],
             'proxy_top_k' => ['required', 'integer', 'min:1', 'max:20'],
@@ -119,7 +118,6 @@ class BrainAdminController extends Controller
         $proxy->enabled = $request->boolean('proxy_enabled');
         $proxy->upstream = $validated['proxy_upstream'];
         $proxy->base_url = (string) ($validated['proxy_base_url'] ?? '');
-        $proxy->model = $validated['proxy_model'];
         $proxy->inject_memory = $request->boolean('proxy_inject_memory');
         $proxy->capture = $request->boolean('proxy_capture');
         $proxy->top_k = (int) $validated['proxy_top_k'];

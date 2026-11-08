@@ -102,12 +102,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="nb-label">Модель по умолчанию</label>
-                    <input type="text" name="proxy_model" value="{{ old('proxy_model', $proxy->model) }}" class="nb-input">
-                </div>
-                <div>
                     <label class="nb-label">Base URL upstream (необязательно)</label>
-                    <input type="text" name="proxy_base_url" value="{{ old('proxy_base_url', $proxy->base_url) }}" class="nb-input" placeholder="https://api.deepseek.com/v1">
+                    <input type="text" name="proxy_base_url" value="{{ old('proxy_base_url', $proxy->base_url) }}" class="nb-input" placeholder="https://api.deepseek.com">
                 </div>
                 <div>
                     <label class="nb-label">API-ключ upstream</label>

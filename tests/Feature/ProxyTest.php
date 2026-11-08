@@ -10,7 +10,10 @@ use App\Models\Message;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Services\Brain\SourceRegistry;
+use App\Settings\ProxySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ProxyTest extends TestCase
@@ -30,6 +33,54 @@ class ProxyTest extends TestCase
             ),
             source: app(SourceRegistry::class)->manual(),
         );
+    }
+
+    public function test_harness_controls_model_and_reasoning_settings(): void
+    {
+        $settings = app(ProxySettings::class);
+        $settings->upstream = 'openai';
+        $settings->base_url = 'https://upstream.test/v1';
+        $settings->api_key = 'test-key';
+        $settings->model = 'admin-default-model';
+        $settings->save();
+
+        Http::fake([
+            'https://upstream.test/v1/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'harness-model',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ]),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer dev-proxy-token',
+            'X-Neiro-Session' => 'settings-passthrough',
+        ])->postJson('/v1/chat/completions', [
+            'model' => 'harness-model',
+            'reasoning_effort' => 'high',
+            'thinking' => ['type' => 'enabled'],
+            'temperature' => 0.35,
+            'messages' => [['role' => 'user', 'content' => 'test']],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $data = $request->data();
+
+            return $request->url() === 'https://upstream.test/v1/chat/completions'
+                && ($data['model'] ?? null) === 'harness-model'
+                && ($data['reasoning_effort'] ?? null) === 'high'
+                && ($data['thinking']['type'] ?? null) === 'enabled'
+                && ($data['temperature'] ?? null) === 0.35;
+        });
     }
 
     public function test_openai_proxy_injects_memory_and_records_conversation(): void

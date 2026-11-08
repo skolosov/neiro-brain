@@ -24,7 +24,7 @@ class ProxySettings extends Settings
     #[ShouldBeEncrypted]
     public string $access_token = 'dev-proxy-token';
 
-    public string $model = 'gpt-4o-mini';
+    public string $model = 'deepseek-flash';
 
     public bool $inject_memory = true;
 

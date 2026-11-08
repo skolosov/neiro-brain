@@ -25,8 +25,11 @@ DeepSeek Harness
 |---|---|
 | Upstream | `deepseek` |
 | Base URL | `https://api.deepseek.com` |
-| Модель | `deepseek-flash` |
 | API-ключ upstream | ключ DeepSeek |
+
+Модель в Neiro Brain **не выбирается**: её присылает харнесс в поле `model`.
+Прокси передаёт `model`, `reasoning_effort`, `thinking`, `temperature` и остальные
+параметры запроса без изменений. В админке хранятся только провайдер, URL и ключ.
 
 Проверка:
 
@@ -62,15 +65,29 @@ curl http://127.0.0.1/v1/chat/completions \
         models:
           - id: deepseek-flash
             name: DeepSeek Flash via Neiro Brain
+            reasoningEfforts:
+              low: low
+              medium: high
+              high: max
           - id: deepseek-v4-pro
             name: DeepSeek V4 Pro via Neiro Brain
+            reasoningEfforts:
+              low: low
+              medium: high
+              high: max
         compat:
           supportsDeveloperRole: false
           maxTokensField: max_tokens
+          supportsReasoningEffort: true
+          thinkingFormat: deepseek
 ```
 
-В UI: **Settings → Models → Neiro Brain (DeepSeek)** → выбрать `deepseek-flash`.
-Новые сессии пойдут через прокси; старые сохраняют свою модель.
+В UI: **Settings → Models → Neiro Brain (DeepSeek)** → выбрать `deepseek-flash`
+и уровень размышления. Новые сессии пойдут через прокси; старые сохраняют свою модель.
+
+`reasoningEfforts` — это отображение уровней DSH на то, что понимает DeepSeek:
+`low → low`, `medium → high`, `high → max`. Выбор остаётся в харнессе; прокси
+ничего не подставляет.
 
 `compat` нужен, потому что прокси — не OpenAI: без него pi-ai может отправить
 `developer`-роль и `max_completion_tokens`, которые gateway отвергнет.
