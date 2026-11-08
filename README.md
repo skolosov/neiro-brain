@@ -26,8 +26,9 @@ Claude Code / Codex / Cursor / OpenAI SDK
 
 ## Что уже есть
 
-- **Прозрачный прокси** `/v1/chat/completions`, `/v1/responses` и `/v1/messages`:
-  харнессу нужно поменять только base URL и токен. Тело ответа и SSE-поток не переписываются.
+- **Прозрачный прокси** `/v1/chat/completions`, `/v1/responses`, `/v1/messages` и
+  `/v1/messages/count_tokens`: харнессу нужно поменять только base URL и токен.
+  Тело ответа и SSE-поток не переписываются.
 - **Память в промпте**: BM25-поиск по базе, компактный блок фактов в system prompt,
   заголовок `X-Neiro-Memory-Hits` для отладки, `X-Neiro-Memory: off` для отключения.
 - **Захват диалогов**: сессии, сообщения, харнесс, проект, модель, usage — всё в PostgreSQL.
@@ -114,7 +115,8 @@ OPENAI_API_KEY=dev-proxy-token
 ```
 
 Токен — это `proxy_access_token` из админки (или `BRAIN_PROXY_TOKEN`). Ключ провайдера
-подставляет прокси; клиенту он не нужен.
+подставляет прокси; клиенту он не нужен. Codex и другие клиенты на OpenAI Responses API
+работают через `/v1/responses` — base URL тот же.
 
 ### Claude Code / Anthropic SDK
 
@@ -303,7 +305,7 @@ php artisan test
 vendor\bin\pint
 ```
 
-39 тестов покрывают: BM25 (редкость, длина, фильтры, черновики, морфологию),
+44 теста покрывают: BM25 (редкость, длина, фильтры, черновики, морфологию),
 маскировку секретов, прокси (mock/stream/Anthropic, инъекцию памяти, захват),
 MCP-инструменты, админку, шифрование настроек, JSONL-коннектор и AI-пайплайн
 (через `KnowledgeExtractionAgent::fake()`).

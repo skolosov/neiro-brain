@@ -248,6 +248,31 @@ class ProxyController extends Controller
         ]);
     }
 
+    public function countTokens(Request $request): Response
+    {
+        $payload = $request->json()->all();
+        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+
+        if ($upstream->mock) {
+            $text = json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '';
+
+            return response()->json(['input_tokens' => max(1, (int) ceil(mb_strlen($text) / 3.2))]);
+        }
+
+        if ($upstream->baseUrl === '' || $upstream->apiKey === '') {
+            return $this->error('Upstream API is not configured.', 503, 'anthropic');
+        }
+
+        $response = Http::withHeaders($this->anthropicHeaders($request, $upstream))
+            ->withOptions(['http_errors' => false])
+            ->timeout($upstream->timeout)
+            ->post($upstream->url('messages/count_tokens'), $payload);
+
+        return response($response->body(), $response->status(), [
+            'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+        ]);
+    }
+
     public function models(Request $request): Response
     {
         $upstream = $this->resolver->resolve($this->settings);

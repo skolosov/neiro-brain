@@ -121,6 +121,19 @@ class ProxyTest extends TestCase
         $this->assertSame(2, Message::query()->count());
     }
 
+    public function test_anthropic_count_tokens_passthrough(): void
+    {
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer dev-proxy-token',
+        ])->postJson('/v1/messages/count_tokens', [
+            'model' => 'claude-test',
+            'messages' => [['role' => 'user', 'content' => 'Привет']],
+        ]);
+
+        $response->assertOk();
+        $this->assertGreaterThan(0, $response->json('input_tokens'));
+    }
+
     public function test_anthropic_messages_endpoint_works(): void
     {
         $this->seedKnowledge();

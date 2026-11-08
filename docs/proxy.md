@@ -10,6 +10,7 @@
 | POST | `/v1/chat/completions` | OpenAI Chat Completions |
 | POST | `/v1/responses` | OpenAI Responses (Codex) |
 | POST | `/v1/messages` | Anthropic Messages |
+| POST | `/v1/messages/count_tokens` | Anthropic token counting (passthrough) |
 | GET | `/v1/models` | список моделей upstream/mock |
 
 Тело запроса и ответа не модифицируется. В ответ добавляются только заголовки
