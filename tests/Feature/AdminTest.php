@@ -84,6 +84,7 @@ class AdminTest extends TestCase
             ->assertSee('Токены доступа')
             ->assertSee('Поиск')
             ->assertSee('Суммаризация')
+            ->assertSee('Насыщение повторов')
             ->assertDontSee('Upstream');
     }
 

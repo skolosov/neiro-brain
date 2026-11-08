@@ -11,9 +11,9 @@ class AiSettings extends Settings
 {
     public bool $enabled = true;
 
-    public string $provider = 'openai';
+    public string $provider = 'deepseek';
 
-    public string $model = 'gpt-4o-mini';
+    public string $model = 'deepseek-flash';
 
     #[ShouldBeEncrypted]
     public string $api_key = '';

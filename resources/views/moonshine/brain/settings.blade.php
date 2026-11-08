@@ -134,19 +134,24 @@
 
         <section class="nb-section">
             <h2>Поиск</h2>
+            <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
+                Параметры Okapi BM25 — по ним база ищет факты, которые подмешиваются в промпт
+                и отдаются через MCP. Меняются на лету, без переиндексации.
+            </p>
             <div class="nb-form-grid nb-form-grid-3">
                 @foreach ([
-                    ['retrieval_k1', 'k1', $retrieval->k1, '0.1', '3', '0.1'],
-                    ['retrieval_b', 'b (нормализация длины)', $retrieval->b, '0', '1', '0.05'],
-                    ['retrieval_top_k', 'top K', $retrieval->top_k, '1', '50', '1'],
-                    ['retrieval_chunk_chars', 'Размер чанка, символов', $retrieval->chunk_chars, '300', '4000', '50'],
-                    ['retrieval_chunk_overlap', 'Перекрытие, символов', $retrieval->chunk_overlap, '0', '1000', '10'],
-                    ['retrieval_freshness_weight', 'Бонус за свежесть', $retrieval->freshness_weight, '0', '1', '0.05'],
-                    ['retrieval_importance_weight', 'Вес важности', $retrieval->importance_weight, '0', '0.5', '0.01'],
-                ] as [$name, $title, $value, $min, $max, $step])
+                    ['retrieval_k1', 'k1', $retrieval->k1, '0.1', '3', '0.1', 'Насыщение повторов: 1.2 — прирост за второе-третье вхождение слова, после — почти нет. Больше — повторы весят сильнее.'],
+                    ['retrieval_b', 'b (нормализация длины)', $retrieval->b, '0', '1', '0.05', '0.75 — штраф длинным статьям, короткая точная заметка весит больше. 0 — длина не важна.'],
+                    ['retrieval_top_k', 'top K', $retrieval->top_k, '1', '50', '1', 'Сколько записей поиск возвращает по умолчанию.'],
+                    ['retrieval_chunk_chars', 'Размер чанка, символов', $retrieval->chunk_chars, '300', '4000', '50', 'На сколько частей режется запись при индексации. Меньше — точнее, больше — шире контекст.'],
+                    ['retrieval_chunk_overlap', 'Перекрытие, символов', $retrieval->chunk_overlap, '0', '1000', '10', 'Сколько символов соседние чанки делят между собой, чтобы мысль не рвалась на границе.'],
+                    ['retrieval_freshness_weight', 'Бонус за свежесть', $retrieval->freshness_weight, '0', '1', '0.05', 'Насколько свежие знания весят больше старых (полураспад — 90 дней). 0 — отключено.'],
+                    ['retrieval_importance_weight', 'Вес важности', $retrieval->importance_weight, '0', '0.5', '0.01', 'Насколько очки умножаются на важность записи (1–5). 0.08 — важность 5 даёт +16%.'],
+                ] as [$name, $title, $value, $min, $max, $step, $hint])
                     <div>
                         <label class="nb-label">{{ $title }}</label>
                         <input type="number" name="{{ $name }}" value="{{ old($name, $value) }}" min="{{ $min }}" max="{{ $max }}" step="{{ $step }}" class="nb-input">
+                        <p class="nb-help">{{ $hint }}</p>
                     </div>
                 @endforeach
             </div>
@@ -174,7 +179,7 @@
                 </div>
                 <div>
                     <label class="nb-label">Base URL (необязательно)</label>
-                    <input type="text" name="ai_base_url" value="{{ old('ai_base_url', $ai->base_url) }}" class="nb-input" placeholder="https://api.openai.com/v1">
+                    <input type="text" name="ai_base_url" value="{{ old('ai_base_url', $ai->base_url) }}" class="nb-input" placeholder="https://api.deepseek.com">
                 </div>
                 <div>
                     <label class="nb-label">Temperature</label>
