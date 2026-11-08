@@ -16,4 +16,5 @@ Route::prefix('admin/brain')
         Route::post('/reindex', [BrainAdminController::class, 'reindex'])->name('reindex');
         Route::post('/conversations/{conversation}/summarize', [BrainAdminController::class, 'summarize'])->name('summarize');
         Route::post('/settings', [BrainAdminController::class, 'updateSettings'])->name('settings');
+        Route::post('/tokens', [BrainAdminController::class, 'generateToken'])->name('tokens.generate');
     });

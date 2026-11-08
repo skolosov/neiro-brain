@@ -1,8 +1,18 @@
 @include('moonshine.brain.styles')
 
+@php
+    $reveal = fn (?string $token): string => $token !== null && $token !== '' ? $token : 'не задан';
+@endphp
+
 <div class="nb-page">
     @if (session('brain_status'))
         <div class="nb-flash">{{ session('brain_status') }}</div>
+    @endif
+    @if (session('brain_generated'))
+        <div class="nb-flash">
+            Новый {{ session('brain_generated') }}-токен создан. Скопируйте его и обновите в харнессе —
+            старое значение больше не действует.
+        </div>
     @endif
 
     @if ($errors->any())
@@ -18,17 +28,135 @@
 
     <div>
         <h1 class="nb-title">Настройки Neiro Brain</h1>
-        <p class="nb-subtitle">Секреты хранятся в таблице settings в зашифрованном виде (AES-256, ключ приложения).</p>
+        <p class="nb-subtitle">
+            Провайдер, ключ и параметры модели приходят из харнесса транзитом.
+            Здесь — токены доступа и настройки самой базы знаний.
+        </p>
     </div>
 
     <form method="POST" action="{{ route('brain.admin.settings') }}" class="nb-form">
         @csrf
 
         <section class="nb-section">
-            <h2>Извлечение знаний (Laravel AI SDK)</h2>
+            <h2>Токены доступа</h2>
+            <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
+                Три независимых токена. Сгенерируйте свои, скопируйте в харнесс — здесь они больше не показываются полностью.
+            </p>
+
+            <div class="nb-token">
+                <div class="nb-token-head">
+                    <div>
+                        <div class="nb-label" style="margin:0">Прокси-токен</div>
+                        <div class="nb-help" style="margin:0">Заголовок <code>X-Neiro-Proxy-Token</code> для <code>/v1/*</code></div>
+                    </div>
+                    <div class="nb-token-value"><code id="nb-proxy-token">{{ $reveal($proxy->access_token) }}</code></div>
+                </div>
+                <div class="nb-token-actions">
+                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-proxy-token">Скопировать</button>
+                    <button type="submit" class="nb-btn nb-btn-secondary"
+                            formaction="{{ route('brain.admin.tokens.generate') }}"
+                            name="action_generate_token" value="proxy"
+                            onclick="return confirm('Сгенерировать новый прокси-токен? Харнесс перестанет работать, пока не обновите токен в нём.')">
+                        Сгенерировать новый
+                    </button>
+                </div>
+            </div>
+
+            <div class="nb-token">
+                <div class="nb-token-head">
+                    <div>
+                        <div class="nb-label" style="margin:0">MCP-токен</div>
+                        <div class="nb-help" style="margin:0">Заголовок <code>Authorization: Bearer</code> для <code>/mcp/knowledge</code></div>
+                    </div>
+                    <div class="nb-token-value"><code id="nb-mcp-token">{{ $reveal($security->mcp_token) }}</code></div>
+                </div>
+                <div class="nb-token-actions">
+                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-mcp-token">Скопировать</button>
+                    <button type="submit" class="nb-btn nb-btn-secondary"
+                            formaction="{{ route('brain.admin.tokens.generate') }}"
+                            name="action_generate_token" value="mcp"
+                            onclick="return confirm('Сгенерировать новый MCP-токен? MCP-сервер в харнессе нужно будет обновить.')">
+                        Сгенерировать новый
+                    </button>
+                </div>
+            </div>
+
+            <div class="nb-token">
+                <div class="nb-token-head">
+                    <div>
+                        <div class="nb-label" style="margin:0">API-токен</div>
+                        <div class="nb-help" style="margin:0">Заголовок <code>Authorization: Bearer</code> для <code>/api/v1/*</code></div>
+                    </div>
+                    <div class="nb-token-value"><code id="nb-api-token">{{ $reveal($security->api_token) }}</code></div>
+                </div>
+                <div class="nb-token-actions">
+                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-api-token">Скопировать</button>
+                    <button type="submit" class="nb-btn nb-btn-secondary"
+                            formaction="{{ route('brain.admin.tokens.generate') }}"
+                            name="action_generate_token" value="api"
+                            onclick="return confirm('Сгенерировать новый API-токен? Внешние интеграции нужно будет обновить.')">
+                        Сгенерировать новый
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="nb-section">
+            <h2>Память и прокси</h2>
             <div class="nb-form-grid">
                 <div>
-                    <label class="nb-label">Провайдер</label>
+                    <label class="nb-label">Top K памяти в промпте</label>
+                    <input type="number" name="proxy_top_k" value="{{ old('proxy_top_k', $proxy->top_k) }}" min="1" max="20" class="nb-input">
+                </div>
+                <div>
+                    <label class="nb-label">Лимит блока памяти, символов</label>
+                    <input type="number" name="proxy_max_context_chars" value="{{ old('proxy_max_context_chars', $proxy->max_context_chars) }}" min="500" max="20000" class="nb-input">
+                </div>
+            </div>
+            <div class="nb-checks">
+                <label class="nb-check">
+                    <input type="hidden" name="proxy_enabled" value="0">
+                    <input type="checkbox" name="proxy_enabled" value="1" @checked($proxy->enabled)>
+                    Прокси включён
+                </label>
+                <label class="nb-check">
+                    <input type="hidden" name="proxy_inject_memory" value="0">
+                    <input type="checkbox" name="proxy_inject_memory" value="1" @checked($proxy->inject_memory)>
+                    Подмешивать память
+                </label>
+                <label class="nb-check">
+                    <input type="hidden" name="proxy_capture" value="0">
+                    <input type="checkbox" name="proxy_capture" value="1" @checked($proxy->capture)>
+                    Записывать диалоги
+                </label>
+            </div>
+        </section>
+
+        <section class="nb-section">
+            <h2>Поиск</h2>
+            <div class="nb-form-grid nb-form-grid-3">
+                @foreach ([
+                    ['retrieval_k1', 'k1', $retrieval->k1, '0.1', '3', '0.1'],
+                    ['retrieval_b', 'b (нормализация длины)', $retrieval->b, '0', '1', '0.05'],
+                    ['retrieval_top_k', 'top K', $retrieval->top_k, '1', '50', '1'],
+                    ['retrieval_chunk_chars', 'Размер чанка, символов', $retrieval->chunk_chars, '300', '4000', '50'],
+                    ['retrieval_chunk_overlap', 'Перекрытие, символов', $retrieval->chunk_overlap, '0', '1000', '10'],
+                    ['retrieval_freshness_weight', 'Бонус за свежесть', $retrieval->freshness_weight, '0', '1', '0.05'],
+                    ['retrieval_importance_weight', 'Вес важности', $retrieval->importance_weight, '0', '0.5', '0.01'],
+                ] as [$name, $title, $value, $min, $max, $step])
+                    <div>
+                        <label class="nb-label">{{ $title }}</label>
+                        <input type="number" name="{{ $name }}" value="{{ old($name, $value) }}" min="{{ $min }}" max="{{ $max }}" step="{{ $step }}" class="nb-input">
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="nb-section">
+            <h2>Суммаризация</h2>
+            <div class="nb-form-grid nb-form-grid-3">
+                <div>
+                    <label class="nb-label">Провайдер для извлечения знаний</label>
                     <select name="ai_provider" class="nb-select">
                         @foreach (['openai' => 'OpenAI', 'anthropic' => 'Anthropic', 'deepseek' => 'DeepSeek', 'openrouter' => 'OpenRouter', 'ollama' => 'Ollama', 'gemini' => 'Gemini'] as $value => $name)
                             <option value="{{ $value }}" @selected($ai->provider === $value)>{{ $name }}</option>
@@ -64,68 +192,7 @@
                     Использовать AI-провайдера (при ошибке — fallback на эвристику)
                 </label>
             </div>
-        </section>
-
-        <section class="nb-section">
-            <h2>BM25 и чанки</h2>
-            <div class="nb-form-grid nb-form-grid-3">
-                @foreach ([
-                    ['retrieval_k1', 'k1', $retrieval->k1, '0.1', '3', '0.1'],
-                    ['retrieval_b', 'b (нормализация длины)', $retrieval->b, '0', '1', '0.05'],
-                    ['retrieval_top_k', 'top K', $retrieval->top_k, '1', '50', '1'],
-                    ['retrieval_chunk_chars', 'Размер чанка, символов', $retrieval->chunk_chars, '300', '4000', '50'],
-                    ['retrieval_chunk_overlap', 'Перекрытие, символов', $retrieval->chunk_overlap, '0', '1000', '10'],
-                    ['retrieval_freshness_weight', 'Бонус за свежесть', $retrieval->freshness_weight, '0', '1', '0.05'],
-                    ['retrieval_importance_weight', 'Вес важности', $retrieval->importance_weight, '0', '0.5', '0.01'],
-                ] as [$name, $title, $value, $min, $max, $step])
-                    <div>
-                        <label class="nb-label">{{ $title }}</label>
-                        <input type="number" name="{{ $name }}" value="{{ old($name, $value) }}" min="{{ $min }}" max="{{ $max }}" step="{{ $step }}" class="nb-input">
-                    </div>
-                @endforeach
-            </div>
-        </section>
-
-        <section class="nb-section">
-            <h2>Прокси для харнессов</h2>
-            <p class="nb-help" style="margin-top:0;margin-bottom:.9rem">
-                Провайдер, модель, API-ключ и уровень размышления задаются <strong>в харнессе</strong>.
-                Прокси только подмешивает память и записывает диалог.
-                Харнесс передаёт <code>X-Neiro-Proxy-Token</code>, <code>X-Neiro-Upstream</code>
-                и свой <code>Authorization</code> / <code>x-api-key</code>.
-            </p>
-            <div class="nb-form-grid">
-                <div>
-                    <label class="nb-label">Bearer-токен для харнессов</label>
-                    <input type="password" name="proxy_access_token" value="" class="nb-input" autocomplete="new-password"
-                           placeholder="{{ $proxy->access_token !== '' ? '•••••••• (оставьте пустым, чтобы не менять)' : 'не задан' }}">
-                </div>
-                <div>
-                    <label class="nb-label">Top K памяти в промпте</label>
-                    <input type="number" name="proxy_top_k" value="{{ old('proxy_top_k', $proxy->top_k) }}" min="1" max="20" class="nb-input">
-                </div>
-                <div>
-                    <label class="nb-label">Лимит блока памяти, символов</label>
-                    <input type="number" name="proxy_max_context_chars" value="{{ old('proxy_max_context_chars', $proxy->max_context_chars) }}" min="500" max="20000" class="nb-input">
-                </div>
-            </div>
-            <div class="nb-checks">
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_enabled" value="0">
-                    <input type="checkbox" name="proxy_enabled" value="1" @checked($proxy->enabled)>
-                    Прокси включён
-                </label>
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_inject_memory" value="0">
-                    <input type="checkbox" name="proxy_inject_memory" value="1" @checked($proxy->inject_memory)>
-                    Подмешивать память
-                </label>
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_capture" value="0">
-                    <input type="checkbox" name="proxy_capture" value="1" @checked($proxy->capture)>
-                    Записывать диалоги
-                </label>
-            </div>
+            <p class="nb-help">Ключ нужен только для суммаризации диалогов в cron, прокси его не использует.</p>
         </section>
 
         <section class="nb-section">
@@ -155,24 +222,12 @@
                     Автоматически подтверждать извлечённые знания
                 </label>
             </div>
-            <p class="nb-help">Расписание: каждые 15 минут через OpenServer-задачу <code>Laravel Schedule</code>.</p>
+            <p class="nb-help">Синхронизация раз в 15 минут через OpenServer-задачу <code>Laravel Schedule</code>.</p>
         </section>
 
         <section class="nb-section">
-            <h2>Безопасность и токены</h2>
-            <div class="nb-form-grid">
-                <div>
-                    <label class="nb-label">MCP-токен</label>
-                    <input type="password" name="security_mcp_token" value="" class="nb-input" autocomplete="new-password"
-                           placeholder="{{ $security->mcp_token !== '' ? '•••••••• (оставьте пустым, чтобы не менять)' : 'не задан' }}">
-                </div>
-                <div>
-                    <label class="nb-label">API-токен</label>
-                    <input type="password" name="security_api_token" value="" class="nb-input" autocomplete="new-password"
-                           placeholder="{{ $security->api_token !== '' ? '•••••••• (оставьте пустым, чтобы не менять)' : 'не задан' }}">
-                </div>
-            </div>
-            <div class="nb-checks">
+            <h2>Приватность</h2>
+            <div class="nb-checks" style="margin-top:0">
                 <label class="nb-check">
                     <input type="hidden" name="security_mask_secrets" value="0">
                     <input type="checkbox" name="security_mask_secrets" value="1" @checked($security->mask_secrets)>
@@ -192,3 +247,17 @@
         </div>
     </form>
 </div>
+
+<script>
+document.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-copy]');
+    if (!button) return;
+    var source = document.getElementById(button.dataset.copy);
+    if (!source) return;
+    navigator.clipboard.writeText(source.textContent.trim()).then(function () {
+        var label = button.textContent;
+        button.textContent = 'Скопировано';
+        setTimeout(function () { button.textContent = label; }, 1500);
+    });
+});
+</script>

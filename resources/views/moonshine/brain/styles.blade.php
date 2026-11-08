@@ -82,4 +82,25 @@
     .nb-help { margin: .45rem 0 0; font-size: .75rem; color: var(--nb-muted); }
     .nb-actions-bottom { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
     .nb-note { font-size: .8rem; color: var(--nb-muted); }
+    .nb-token {
+        border: 1px solid var(--nb-border);
+        border-radius: .6rem;
+        padding: .8rem .9rem;
+        margin-bottom: .75rem;
+        background: var(--nb-accent-soft);
+    }
+    .nb-token-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+    .nb-token-value code {
+        display: inline-block;
+        max-width: 100%;
+        padding: .25rem .55rem;
+        border-radius: .4rem;
+        background: var(--nb-card);
+        border: 1px solid var(--nb-border);
+        color: var(--nb-text);
+        font-size: .82rem;
+        word-break: break-all;
+    }
+    .nb-token-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
+    .nb-token-actions .nb-btn { padding: .4rem .8rem; font-size: .78rem; }
 </style>

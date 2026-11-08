@@ -9,6 +9,7 @@ use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Services\Brain\SourceRegistry;
+use App\Settings\ProxySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
 use Tests\TestCase;
@@ -80,7 +81,44 @@ class AdminTest extends TestCase
             ->get(route('moonshine.page', ['pageUri' => 'settings-page']))
             ->assertOk()
             ->assertSee('Настройки Neiro Brain')
-            ->assertSee('BM25');
+            ->assertSee('Токены доступа')
+            ->assertSee('Поиск')
+            ->assertSee('Суммаризация')
+            ->assertDontSee('Upstream');
+    }
+
+    public function test_admin_can_generate_a_new_proxy_token(): void
+    {
+        $this->actingAs($this->admin(), 'moonshine')
+            ->post(route('brain.admin.tokens.generate'), ['action_generate_token' => 'proxy'])
+            ->assertRedirect();
+
+        $token = app(ProxySettings::class)->refresh()->access_token;
+
+        $this->assertNotSame('dev-proxy-token', $token);
+        $this->assertStringStartsWith('nb-', $token);
+    }
+
+    public function test_generated_token_authorizes_the_proxy(): void
+    {
+        $this->actingAs($this->admin(), 'moonshine')
+            ->post(route('brain.admin.tokens.generate'), ['action_generate_token' => 'proxy']);
+
+        $token = app(ProxySettings::class)->refresh()->access_token;
+
+        $this->withHeaders(['X-Neiro-Proxy-Token' => $token])
+            ->postJson('/v1/chat/completions', [
+                'model' => 'test',
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ])
+            ->assertOk();
+
+        $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-proxy-token'])
+            ->postJson('/v1/chat/completions', [
+                'model' => 'test',
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ])
+            ->assertUnauthorized();
     }
 
     public function test_guest_is_redirected_from_admin(): void

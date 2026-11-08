@@ -17,6 +17,7 @@ use App\Settings\SettingsInitializer;
 use App\Settings\SyncSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class BrainAdminController extends Controller
 {
@@ -50,6 +51,42 @@ class BrainAdminController extends Controller
             $result['created'],
             $result['updated'],
         ));
+    }
+
+    public function generateToken(Request $request): RedirectResponse
+    {
+        app(SettingsInitializer::class)->ensure();
+
+        $target = (string) $request->input('action_generate_token', '');
+        $token = 'nb-'.Str::random(40);
+
+        switch ($target) {
+            case 'proxy':
+                $settings = app(ProxySettings::class);
+                $settings->access_token = $token;
+                $settings->save();
+
+                break;
+
+            case 'mcp':
+                $settings = app(SecuritySettings::class);
+                $settings->mcp_token = $token;
+                $settings->save();
+
+                break;
+
+            case 'api':
+                $settings = app(SecuritySettings::class);
+                $settings->api_token = $token;
+                $settings->save();
+
+                break;
+
+            default:
+                return back()->withErrors(['action_generate_token' => 'Неизвестный тип токена.']);
+        }
+
+        return back()->with('brain_generated', strtoupper($target));
     }
 
     public function updateSettings(Request $request): RedirectResponse
