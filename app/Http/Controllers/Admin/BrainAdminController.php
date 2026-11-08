@@ -72,9 +72,6 @@ class BrainAdminController extends Controller
             'retrieval_freshness_weight' => ['required', 'numeric', 'min:0', 'max:1'],
             'retrieval_importance_weight' => ['required', 'numeric', 'min:0', 'max:0.5'],
             'proxy_enabled' => ['nullable', 'boolean'],
-            'proxy_upstream' => ['required', 'string', 'max:32'],
-            'proxy_base_url' => ['nullable', 'string', 'max:255'],
-            'proxy_api_key' => ['nullable', 'string', 'max:512'],
             'proxy_access_token' => ['nullable', 'string', 'max:255'],
             'proxy_inject_memory' => ['nullable', 'boolean'],
             'proxy_capture' => ['nullable', 'boolean'],
@@ -116,16 +113,10 @@ class BrainAdminController extends Controller
 
         $proxy = app(ProxySettings::class);
         $proxy->enabled = $request->boolean('proxy_enabled');
-        $proxy->upstream = $validated['proxy_upstream'];
-        $proxy->base_url = (string) ($validated['proxy_base_url'] ?? '');
         $proxy->inject_memory = $request->boolean('proxy_inject_memory');
         $proxy->capture = $request->boolean('proxy_capture');
         $proxy->top_k = (int) $validated['proxy_top_k'];
         $proxy->max_context_chars = (int) $validated['proxy_max_context_chars'];
-
-        if (($validated['proxy_api_key'] ?? '') !== '') {
-            $proxy->api_key = $validated['proxy_api_key'];
-        }
 
         if (($validated['proxy_access_token'] ?? '') !== '') {
             $proxy->access_token = $validated['proxy_access_token'];

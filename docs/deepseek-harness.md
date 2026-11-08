@@ -14,38 +14,40 @@ DeepSeek Harness
 - Все запросы DSH идут через Neiro Brain: пользовательская память подмешивается в prompt,
   диалог сохраняется в PostgreSQL.
 - MCP-инструменты `mcp__neiro-brain__*` позволяют агенту искать и запоминать знания.
-- Upstream — DeepSeek (`deepseek-flash`), ключ хранится в настройках Neiro Brain
-  в зашифрованном виде (`APP_KEY`).
+- **Провайдер, ключ, модель и reasoning выбираются в DSH.** Neiro Brain не хранит
+  ключ DeepSeek; он получает провайдерский `Authorization` от харнесса и передаёт его
+  upstream. В Neiro Brain остаётся только собственный proxy-токен.
 
-## 1. Neiro Brain: upstream DeepSeek
+## 1. Neiro Brain: без ключа провайдера
 
-Админка → **Настройки → Прокси для харнессов**:
+Админка → **Настройки → Прокси для харнессов**: там есть только
 
-| Поле | Значение |
+- Bearer-токен для харнесса (`dev-proxy-token`);
+- top K и лимит блока памяти;
+- переключатели памяти/захвата.
+
+Провайдера, Base URL и API-ключа DeepSeek в админке нет. Харнесс присылает:
+
+| Заголовок | Значение |
 |---|---|
-| Upstream | `deepseek` |
-| Base URL | `https://api.deepseek.com` |
-| API-ключ upstream | ключ DeepSeek |
+| `Authorization` | `Bearer <DEEPSEEK_API_KEY>` — ключ провайдера |
+| `X-Neiro-Proxy-Token` | `dev-proxy-token` — доступ к Neiro Brain |
+| `X-Neiro-Upstream` | `deepseek` — какой upstream использовать |
 
-Модель в Neiro Brain **не выбирается**: её присылает харнесс в поле `model`.
-Прокси передаёт `model`, `reasoning_effort`, `thinking`, `temperature` и остальные
-параметры запроса без изменений. В админке хранятся только провайдер, URL и ключ.
-
-Проверка:
-
-```bash
-curl http://127.0.0.1/v1/models \
-  -H "Authorization: Bearer dev-proxy-token"
-```
-
-и реальный запрос:
+Проверка (ключ подставьте свой):
 
 ```bash
 curl http://127.0.0.1/v1/chat/completions \
-  -H "Authorization: Bearer dev-proxy-token" \
+  -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+  -H "X-Neiro-Proxy-Token: dev-proxy-token" \
+  -H "X-Neiro-Upstream: deepseek" \
   -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"Какой у меня стек?"}]}'
+  -d '{"model":"deepseek-flash","reasoning_effort":"high","messages":[{"role":"user","content":"Какой у меня стек?"}]}'
 ```
+
+Старый режим тоже работает: если `X-Neiro-Proxy-Token` не передан, `Authorization`
+считается токеном Neiro Brain, а ключ провайдера берётся из `DEEPSEEK_API_KEY`
+в окружении PHP. Но для DSH используется режим выше — ключ остаётся в харнессе.
 
 ## 2. DSH: провайдер модели
 
@@ -59,9 +61,11 @@ curl http://127.0.0.1/v1/chat/completions \
       neiro-brain:
         displayName: Neiro Brain (DeepSeek)
         api: openai-completions
+        apiKeyEnv: DEEPSEEK_API_KEY
         baseURL: http://127.0.0.1/v1
         headers:
-          Authorization: Bearer dev-proxy-token
+          X-Neiro-Proxy-Token: dev-proxy-token
+          X-Neiro-Upstream: deepseek
         models:
           - id: deepseek-flash
             name: DeepSeek Flash via Neiro Brain
@@ -132,9 +136,9 @@ curl http://127.0.0.1/v1/chat/completions \
 
 | Симптом | Причина |
 |---|---|
-| `MISSING_CREDENTIAL` | в provider нет `headers`/`apiKeyEnv` |
-| 401 от прокси | неверный `dev-proxy-token` |
-| 503 от прокси | не задан ключ/URL DeepSeek в админке |
+| `MISSING_CREDENTIAL` | DSH не нашёл `DEEPSEEK_API_KEY`; добавьте ключ в Settings → Models |
+| 401 от прокси | неверный `X-Neiro-Proxy-Token` (или `Authorization`, если режим старый) |
+| 503 от прокси | харнесс не прислал `Authorization`/`X-Neiro-Upstream`, либо upstream недоступен |
 | Нет провайдера в Models | DSH не перечитал `cordis.patch.yml`; обновите страницу/перезапустите DSH |
 | MCP-инструментов нет | проверьте `serverName` и `url`; DSH должен быть запущен после правки |
-| Долгий ответ | DeepSeek V4 Flash думает; для коротких задач выбирайте `reasoningEffort: off` |
+| Долгий ответ | DeepSeek V4 Flash думает; для коротких задач выбирайте уровень `low` |

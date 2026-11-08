@@ -18,18 +18,24 @@
 
 ## Настройка upstream
 
-Админка → **Настройки** → **Прокси**:
+Провайдер, модель, API-ключ и reasoning выбирает **харнесс**. Neiro Brain хранит
+только свой proxy-токен и настройки памяти:
 
-| Поле | Значение |
+| Заголовок харнесса | Назначение |
 |---|---|
-| Upstream | `mock`, `openai`, `anthropic`, `deepseek`, `openrouter`, `ollama` |
-| Base URL | переопределяет стандартный адрес (например, свой шлюз) |
-| API key | ключ провайдера; клиенту его знать не нужно |
-| Модель | **не настраивается**: приходит от харнесса в `model` |
-| Bearer-токен | токен, который предъявляет харнесс |
+| `Authorization: Bearer <provider key>` | ключ провайдера; уходит в upstream |
+| `X-Neiro-Proxy-Token: <proxy token>` | доступ к Neiro Brain |
+| `X-Neiro-Upstream: openai\|deepseek\|...` | какой upstream использовать |
+
+В админке (**Настройки → Прокси**) остаются только Bearer-токен, top K, лимит
+контекста и переключатели памяти/захвата. Поля «Upstream», «Base URL» и «API key»
+убраны: подключение модели — ответственность харнесса.
+
+Если `X-Neiro-Proxy-Token` не передан, работает старый режим: `Authorization`
+считается токеном Neiro Brain, а ключ провайдера берётся из `settings`/`env`.
 
 Стандартные base URL: OpenAI `https://api.openai.com/v1`, DeepSeek
-`https://api.deepseek.com/v1`, OpenRouter `https://openrouter.ai/api/v1`,
+`https://api.deepseek.com`, OpenRouter `https://openrouter.ai/api/v1`,
 Ollama `http://127.0.0.1:11434/v1`, Anthropic `https://api.anthropic.com/v1`.
 
 `mock` работает без сети: отвечает в формате выбранного протокола и перечисляет

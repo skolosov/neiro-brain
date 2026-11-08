@@ -12,7 +12,7 @@ final class UpstreamResolver
     /** @var array<string, string> */
     private const DEFAULT_BASE_URLS = [
         'openai' => 'https://api.openai.com/v1',
-        'deepseek' => 'https://api.deepseek.com/v1',
+        'deepseek' => 'https://api.deepseek.com',
         'openrouter' => 'https://openrouter.ai/api/v1',
         'ollama' => 'http://127.0.0.1:11434/v1',
         'anthropic' => 'https://api.anthropic.com/v1',
@@ -27,9 +27,13 @@ final class UpstreamResolver
         'anthropic' => 'ANTHROPIC_API_KEY',
     ];
 
-    public function resolve(ProxySettings $settings, ?string $requestedModel = null): UpstreamConfig
-    {
-        $driver = strtolower(trim($settings->upstream ?: 'mock'));
+    public function resolve(
+        ProxySettings $settings,
+        ?string $requestedModel = null,
+        ?string $requestedUpstream = null,
+        ?string $requestedKey = null,
+    ): UpstreamConfig {
+        $driver = strtolower(trim($requestedUpstream ?: $settings->upstream ?: 'mock'));
 
         if ($driver === 'mock') {
             return new UpstreamConfig(
@@ -48,7 +52,11 @@ final class UpstreamResolver
             $baseUrl = self::DEFAULT_BASE_URLS[$driver] ?? '';
         }
 
-        $apiKey = trim($settings->api_key);
+        $apiKey = trim((string) $requestedKey);
+
+        if ($apiKey === '') {
+            $apiKey = trim($settings->api_key);
+        }
 
         if ($apiKey === '' && isset(self::KEY_ENV[$driver])) {
             $apiKey = (string) env(self::KEY_ENV[$driver], '');

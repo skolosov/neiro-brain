@@ -23,7 +23,13 @@ class VerifyBrainToken
     public function handle(Request $request, Closure $next, string $scope = 'api'): Response
     {
         $expected = $this->expectedToken($scope);
-        $provided = $request->bearerToken() ?: $request->header('x-api-key');
+        $proxyHeader = trim((string) $request->header('X-Neiro-Proxy-Token'));
+
+        // Preferred for harnesses: the model provider key stays in Authorization,
+        // while Neiro Brain's own token travels in X-Neiro-Proxy-Token.
+        $provided = $proxyHeader !== ''
+            ? $proxyHeader
+            : ($request->bearerToken() ?: $request->header('x-api-key'));
 
         if ($expected === null || $provided === null || ! hash_equals($expected, $provided)) {
             return $this->unauthorized($request, $scope);

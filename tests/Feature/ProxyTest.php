@@ -35,6 +35,50 @@ class ProxyTest extends TestCase
         );
     }
 
+    public function test_provider_key_and_upstream_can_come_from_the_harness(): void
+    {
+        $settings = app(ProxySettings::class);
+        $settings->upstream = 'mock';
+        $settings->base_url = '';
+        $settings->api_key = '';
+        $settings->save();
+
+        Http::fake([
+            'https://api.deepseek.com/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'deepseek-flash',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+            ]),
+        ]);
+
+        $response = $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+            'X-Neiro-Session' => 'harness-key',
+        ])->postJson('/v1/chat/completions', [
+            'model' => 'deepseek-flash',
+            'reasoning_effort' => 'max',
+            'messages' => [['role' => 'user', 'content' => 'test']],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $authorization = $request->headers()['Authorization'][0] ?? null;
+
+            return $request->url() === 'https://api.deepseek.com/chat/completions'
+                && $authorization === 'Bearer sk-from-harness'
+                && ($request->data()['reasoning_effort'] ?? null) === 'max';
+        });
+    }
+
     public function test_harness_controls_model_and_reasoning_settings(): void
     {
         $settings = app(ProxySettings::class);

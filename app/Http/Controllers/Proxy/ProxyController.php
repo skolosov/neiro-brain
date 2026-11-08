@@ -50,7 +50,7 @@ class ProxyController extends Controller
             return $this->error('The "messages" field is required.', 422, 'openai');
         }
 
-        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+        $upstream = $this->resolveUpstream($request, $payload);
         $configurationError = $this->configurationError($upstream, 'openai');
 
         if ($configurationError !== null) {
@@ -123,7 +123,7 @@ class ProxyController extends Controller
             return $this->error('The "input" field is required.', 422, 'openai');
         }
 
-        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+        $upstream = $this->resolveUpstream($request, $payload);
         $configurationError = $this->configurationError($upstream, 'openai');
 
         if ($configurationError !== null) {
@@ -191,7 +191,7 @@ class ProxyController extends Controller
             return $this->error('The "messages" field is required.', 422, 'anthropic');
         }
 
-        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+        $upstream = $this->resolveUpstream($request, $payload);
         $configurationError = $this->configurationError($upstream, 'anthropic');
 
         if ($configurationError !== null) {
@@ -251,7 +251,7 @@ class ProxyController extends Controller
     public function countTokens(Request $request): Response
     {
         $payload = $request->json()->all();
-        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+        $upstream = $this->resolveUpstream($request, $payload);
 
         if ($upstream->mock) {
             $text = json_encode($payload, JSON_UNESCAPED_UNICODE) ?: '';
@@ -275,7 +275,7 @@ class ProxyController extends Controller
 
     public function models(Request $request): Response
     {
-        $upstream = $this->resolver->resolve($this->settings);
+        $upstream = $this->resolveUpstream($request, []);
 
         if ($upstream->mock) {
             return response()->json([
@@ -759,6 +759,33 @@ class ProxyController extends Controller
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Resolve the upstream from the harness, not from admin settings.
+     *
+     * When X-Neiro-Proxy-Token is present, Authorization / x-api-key carries the
+     * provider key chosen by the harness. X-Neiro-Upstream selects the provider.
+     * Older clients that use the proxy token as Authorization keep working.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveUpstream(Request $request, array $payload): UpstreamConfig
+    {
+        $hasProxyToken = trim((string) $request->header('X-Neiro-Proxy-Token')) !== '';
+
+        $providerKey = $hasProxyToken
+            ? ($request->bearerToken() ?: $request->header('x-api-key'))
+            : null;
+
+        $requestedUpstream = $request->header('X-Neiro-Upstream');
+
+        return $this->resolver->resolve(
+            $this->settings,
+            isset($payload['model']) ? (string) $payload['model'] : null,
+            is_string($requestedUpstream) && trim($requestedUpstream) !== '' ? trim($requestedUpstream) : null,
+            is_string($providerKey) && trim($providerKey) !== '' ? trim($providerKey) : null,
+        );
     }
 
     private function configurationError(UpstreamConfig $upstream, string $format): ?JsonResponse

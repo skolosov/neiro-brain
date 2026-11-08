@@ -123,29 +123,44 @@ php artisan brain:sync --force
 
 ### OpenAI-совместимые клиенты (Codex, Cursor, Continue, SDK)
 
+Подключение модели — в харнессе. Клиент отправляет **свой** ключ провайдера
+в `Authorization`, а Neiro Brain открывает отдельный `X-Neiro-Proxy-Token`:
+
 ```bash
 OPENAI_BASE_URL=http://neiro-brain.local/v1
-OPENAI_API_KEY=dev-proxy-token
+OPENAI_API_KEY=<ключ провайдера, например DeepSeek>
+# дополнительные заголовки клиента:
+# X-Neiro-Proxy-Token: dev-proxy-token
+# X-Neiro-Upstream: deepseek
 ```
 
-Токен — это `proxy_access_token` из админки (или `BRAIN_PROXY_TOKEN`). Ключ провайдера
-подставляет прокси; клиенту он не нужен. Codex и другие клиенты на OpenAI Responses API
-работают через `/v1/responses` — base URL тот же.
+`X-Neiro-Upstream` выбирает провайдера; `model`, `reasoning_effort`, `thinking`,
+`temperature` и остальные параметры передаются без изменений. Codex и другие клиенты
+на OpenAI Responses API работают через `/v1/responses` — base URL тот же.
+
+Если клиент не умеет задавать дополнительные заголовки, используйте fallback:
+положите ключ провайдера в `DEEPSEEK_API_KEY` окружения PHP и передавайте
+`Authorization: Bearer dev-proxy-token` как раньше.
 
 ### Claude Code / Anthropic SDK
 
 ```bash
 export ANTHROPIC_BASE_URL=http://neiro-brain.local
-export ANTHROPIC_API_KEY=dev-proxy-token
+export ANTHROPIC_API_KEY=<ключ провайдера>
+# X-Neiro-Proxy-Token: dev-proxy-token
+# X-Neiro-Upstream: anthropic или deepseek
 ```
 
-Anthropic-клиент сам добавит `/v1/messages`. Прокси принимает токен и в `Authorization`,
-и в `x-api-key`.
+Anthropic-клиент сам добавит `/v1/messages`. Прокси принимает токен Neiro Brain
+в `X-Neiro-Proxy-Token`, а провайдерский ключ — в `x-api-key`/`Authorization`
+и передаёт его upstream.
 
 ### Заголовки (необязательные)
 
 | Заголовок | Назначение |
 |---|---|
+| `X-Neiro-Proxy-Token` | Токен доступа к Neiro Brain (когда провайдерский ключ идёт в `Authorization`) |
+| `X-Neiro-Upstream` | `deepseek`, `openai`, `anthropic`, `openrouter`, `ollama` |
 | `X-Neiro-Session: my-session` | Стабильный id диалога (иначе вычисляется по system prompt + user-agent + дата) |
 | `X-Neiro-Project: Sklad` | Проект для фильтрации и админки |
 | `X-Neiro-Harness: codex` | Имя харнесса (иначе определяется по User-Agent) |
@@ -336,7 +351,7 @@ php artisan test
 vendor\bin\pint
 ```
 
-45 тестов покрывают: BM25 (редкость, длина, фильтры, черновики, морфологию),
+46 тестов покрывают: BM25 (редкость, длина, фильтры, черновики, морфологию),
 маскировку секретов, прокси (mock/stream/Anthropic, инъекцию памяти, захват),
 MCP-инструменты, админку, шифрование настроек, JSONL-коннектор и AI-пайплайн
 (через `KnowledgeExtractionAgent::fake()`).

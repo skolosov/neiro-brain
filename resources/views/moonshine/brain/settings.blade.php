@@ -89,27 +89,12 @@
         <section class="nb-section">
             <h2>Прокси для харнессов</h2>
             <p class="nb-help" style="margin-top:0;margin-bottom:.9rem">
-                База URL: <code>{{ url('/v1') }}</code>.
-                Харнесс указывает её вместо api.openai.com / api.anthropic.com и передаёт токен из поля ниже.
+                Провайдер, модель, API-ключ и уровень размышления задаются <strong>в харнессе</strong>.
+                Прокси только подмешивает память и записывает диалог.
+                Харнесс передаёт <code>X-Neiro-Proxy-Token</code>, <code>X-Neiro-Upstream</code>
+                и свой <code>Authorization</code> / <code>x-api-key</code>.
             </p>
             <div class="nb-form-grid">
-                <div>
-                    <label class="nb-label">Upstream</label>
-                    <select name="proxy_upstream" class="nb-select">
-                        @foreach (['mock' => 'Mock (демо, без сети)', 'openai' => 'OpenAI', 'anthropic' => 'Anthropic', 'deepseek' => 'DeepSeek', 'openrouter' => 'OpenRouter', 'ollama' => 'Ollama'] as $value => $name)
-                            <option value="{{ $value }}" @selected($proxy->upstream === $value)>{{ $name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="nb-label">Base URL upstream (необязательно)</label>
-                    <input type="text" name="proxy_base_url" value="{{ old('proxy_base_url', $proxy->base_url) }}" class="nb-input" placeholder="https://api.deepseek.com">
-                </div>
-                <div>
-                    <label class="nb-label">API-ключ upstream</label>
-                    <input type="password" name="proxy_api_key" value="" class="nb-input" autocomplete="new-password"
-                           placeholder="{{ $proxy->api_key !== '' ? '•••••••• (оставьте пустым, чтобы не менять)' : 'не задан' }}">
-                </div>
                 <div>
                     <label class="nb-label">Bearer-токен для харнессов</label>
                     <input type="password" name="proxy_access_token" value="" class="nb-input" autocomplete="new-password"
