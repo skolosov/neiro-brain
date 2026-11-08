@@ -14,6 +14,7 @@ use App\Services\Brain\KnowledgeSearch;
 use App\Services\Brain\SourceRegistry;
 use App\Services\Proxy\Dto\UpstreamConfig;
 use App\Services\Proxy\MockUpstream;
+use App\Services\Proxy\ToolSchemaNormalizer;
 use App\Services\Proxy\UpstreamResolver;
 use App\Settings\ProxySettings;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,7 @@ class ProxyController extends Controller
         private readonly ContextBuilder $context,
         private readonly SourceRegistry $sources,
         private readonly ConversationIngestor $ingestor,
+        private readonly ToolSchemaNormalizer $toolSchemas,
     ) {}
 
     public function chatCompletions(Request $request): Response
@@ -65,6 +67,8 @@ class ProxyController extends Controller
         if ($context !== '') {
             $payload['messages'] = $this->context->injectOpenAi($payload['messages'], $context);
         }
+
+        $payload = $this->toolSchemas->normalizeOpenAi($payload);
 
         $headers = [
             'X-Neiro-Memory-Hits' => (string) count($hits),
@@ -142,6 +146,8 @@ class ProxyController extends Controller
             );
         }
 
+        $payload = $this->toolSchemas->normalizeOpenAi($payload);
+
         $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
 
         if ($conversation !== null) {
@@ -206,6 +212,8 @@ class ProxyController extends Controller
         if ($context !== '') {
             $payload['system'] = $this->context->injectAnthropicSystem($payload['system'] ?? null, $context);
         }
+
+        $payload = $this->toolSchemas->normalizeAnthropic($payload);
 
         $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
 

@@ -35,6 +35,50 @@ class ProxyTest extends TestCase
         );
     }
 
+    public function test_empty_tool_schema_is_normalized_for_strict_gateways(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'deepseek-flash',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+            ]),
+        ]);
+
+        $response = $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+        ])->postJson('/v1/chat/completions', [
+            'model' => 'deepseek-flash',
+            'messages' => [['role' => 'user', 'content' => 'test']],
+            'tools' => [[
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_goal',
+                    'description' => 'Get the current goal',
+                    'parameters' => [],
+                ],
+            ]],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $parameters = $request->data()['tools'][0]['function']['parameters'] ?? null;
+
+            return is_array($parameters)
+                && ($parameters['type'] ?? null) === 'object'
+                && array_key_exists('properties', $parameters);
+        });
+    }
+
     public function test_provider_key_and_upstream_can_come_from_the_harness(): void
     {
         $settings = app(ProxySettings::class);

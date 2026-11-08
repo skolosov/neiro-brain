@@ -70,12 +70,14 @@ curl http://127.0.0.1/v1/chat/completions \
           - id: deepseek-flash
             name: DeepSeek Flash via Neiro Brain
             reasoningEfforts:
+              off:
               low: low
               medium: high
               high: max
           - id: deepseek-v4-pro
             name: DeepSeek V4 Pro via Neiro Brain
             reasoningEfforts:
+              off:
               low: low
               medium: high
               high: max
@@ -88,6 +90,11 @@ curl http://127.0.0.1/v1/chat/completions \
 
 В UI: **Settings → Models → Neiro Brain (DeepSeek)** → выбрать `deepseek-flash`
 и уровень размышления. Новые сессии пойдут через прокси; старые сохраняют свою модель.
+
+Base URL и модели можно менять в UI, но **кастомные заголовки**
+(`X-Neiro-Proxy-Token`, `X-Neiro-Upstream`) задаются только в `cordis.patch.yml`
+(в Settings есть кнопка **Open configuration file**). Без них прокси не поймёт,
+что `Authorization` — это ключ провайдера.
 
 `reasoningEfforts` — это отображение уровней DSH на то, что понимает DeepSeek:
 `low → low`, `medium → high`, `high → max`. Выбор остаётся в харнессе; прокси
