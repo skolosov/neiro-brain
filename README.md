@@ -84,16 +84,30 @@ php artisan migrate --seed
 
 ### 3. Запуск
 
-Вариант A, встроенный сервер:
+Домен OpenServer уже настроен в `.osp\project.ini`:
+
+- `http://neiro-brain.local/`
+- `http://neiro-brain.local/admin` — админка;
+- `http://192.168.0.107/` — из локальной сети;
+- `https://neiro-brain.local/` — локальный сертификат (предупреждение браузера).
+
+Проверка:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\network-info.ps1
+```
+
+Если нужен доступ из интернета по статическому IP, настройте проброс 80/443 на
+`192.168.0.107` в роутере. Подробно: [docs/openserver.md](docs/openserver.md).
+
+Резервный вариант, без OpenServer:
 
 ```powershell
 php artisan serve --host=127.0.0.1 --port=8000
 ```
 
-Откройте `http://127.0.0.1:8000/admin`.
-
-Вариант B, домен OpenServer: добавьте домен `neiro-brain.local`, папка —
-`C:\OSPanel65\home\neiro-brain\public`, PHP 8.4. Тогда `APP_URL=http://neiro-brain.local`.
+Тогда откройте `http://127.0.0.1:8000/admin` и временно поставьте
+`APP_URL=http://127.0.0.1:8000`.
 
 ### 4. Проверка
 
@@ -219,9 +233,17 @@ Schedule::command('brain:sync')
     ->runInBackground();
 ```
 
-Нужен только запуск планировщика раз в минуту.
+Нужен только запуск планировщика раз в минуту. В OpenServer это уже настроено в
+`.osp\tasks.ini` — задача `Laravel Schedule` вызывает `php artisan schedule:run`
+каждую минуту. Отдельный Task Scheduler не требуется.
 
-**Windows (Task Scheduler):**
+Проверка:
+
+```powershell
+Get-Content storage\logs\scheduler.log -Tail 20
+```
+
+Резервный вариант для Windows (если OpenServer-планировщик отключён):
 
 ```powershell
 schtasks /Create /SC MINUTE /MO 1 /TN "Neiro Brain Scheduler" ^

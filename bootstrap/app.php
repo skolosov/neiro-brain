@@ -7,6 +7,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -25,4 +27,31 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->is('v1/*') || $request->expectsJson(),
         );
+
+        // A stale login form (for example after `migrate:fresh` or an
+        // OpenServer restart) should return the user to the login page
+        // instead of a bare "419 Page Expired" screen.
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            $isCsrfFailure = $exception instanceof TokenMismatchException
+                || ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 419);
+
+            if (! $isCsrfFailure) {
+                return null;
+            }
+
+            if ($request->is('admin') || $request->is('admin/*')) {
+                return redirect('/admin/login');
+            }
+
+            if ($request->is('api/*') || $request->is('v1/*') || $request->expectsJson()) {
+                return response()->json([
+                    'error' => [
+                        'type' => 'session_expired',
+                        'message' => 'CSRF token or session expired. Reload the page and try again.',
+                    ],
+                ], 419);
+            }
+
+            return null;
+        });
     })->create();
