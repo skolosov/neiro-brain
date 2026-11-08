@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware('brain.token:proxy')->group(function (): void {
     Route::post('/v1/chat/completions', [ProxyController::class, 'chatCompletions']);
+    Route::post('/v1/responses', [ProxyController::class, 'responses']);
     Route::post('/v1/messages', [ProxyController::class, 'messages']);
     Route::get('/v1/models', [ProxyController::class, 'models']);
 });

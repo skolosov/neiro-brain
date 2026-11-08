@@ -154,6 +154,43 @@ final class ContextBuilder
     }
 
     /**
+     * Extract the last user text from the OpenAI Responses API "input" field.
+     */
+    public function lastResponsesInputText(mixed $input): string
+    {
+        if (is_string($input)) {
+            return trim($input);
+        }
+
+        if (! is_array($input)) {
+            return '';
+        }
+
+        foreach (array_reverse($input) as $item) {
+            if (! is_array($item) || ($item['role'] ?? null) !== 'user') {
+                continue;
+            }
+
+            $text = $this->contentToText($item['content'] ?? $item['text'] ?? '');
+
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return '';
+    }
+
+    public function injectInstructions(?string $instructions, string $context): string
+    {
+        if ($context === '') {
+            return $instructions ?? '';
+        }
+
+        return trim(($instructions ?? '')."\n\n".$context);
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $messages
      */
     public function lastAnthropicUserText(array $messages): string

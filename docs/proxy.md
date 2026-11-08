@@ -8,6 +8,7 @@
 | Метод | Путь | Протокол |
 |---|---|---|
 | POST | `/v1/chat/completions` | OpenAI Chat Completions |
+| POST | `/v1/responses` | OpenAI Responses (Codex) |
 | POST | `/v1/messages` | Anthropic Messages |
 | GET | `/v1/models` | список моделей upstream/mock |
 
@@ -38,7 +39,8 @@ Ollama `http://127.0.0.1:11434/v1`, Anthropic `https://api.anthropic.com/v1`.
 1. Берётся последнее сообщение с ролью `user`.
 2. BM25 ищет `proxy.top_k` записей (по умолчанию 5).
 3. Блок «Долговременная память» добавляется:
-   - в OpenAI — к первому `system`-сообщению или новым `system` в начало;
+   - в OpenAI Chat Completions — к первому `system`-сообщению или новым `system` в начало;
+   - в OpenAI Responses — к `instructions`;
    - в Anthropic — к `system` (строка или массив блоков).
 4. Блок ограничен `proxy.max_context_chars` (по умолчанию 4000 символов).
 
@@ -58,7 +60,8 @@ Ollama `http://127.0.0.1:11434/v1`, Anthropic `https://api.anthropic.com/v1`.
 
 ## Streaming
 
-- SSE проходит без изменений, включая `[DONE]` (OpenAI) и `message_stop` (Anthropic).
+- SSE проходит без изменений, включая `[DONE]` (OpenAI), `response.completed`
+  (Responses API) и `message_stop` (Anthropic).
 - `Content-Type: text/event-stream`, `X-Accel-Buffering: no`.
 - При ошибке upstream до начала потока клиент получает исходный статус и JSON.
 - `ignore_user_abort(true)` — ответ сохраняется, даже если клиент отключился.

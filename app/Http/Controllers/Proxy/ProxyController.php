@@ -115,6 +115,74 @@ class ProxyController extends Controller
         ]);
     }
 
+    public function responses(Request $request): Response
+    {
+        $payload = $request->json()->all();
+
+        if (! array_key_exists('input', $payload) && ! array_key_exists('messages', $payload)) {
+            return $this->error('The "input" field is required.', 422, 'openai');
+        }
+
+        $upstream = $this->resolver->resolve($this->settings, isset($payload['model']) ? (string) $payload['model'] : null);
+        $configurationError = $this->configurationError($upstream, 'openai');
+
+        if ($configurationError !== null) {
+            return $configurationError;
+        }
+
+        $lastUserText = $this->context->lastResponsesInputText($payload['input'] ?? $payload['messages'] ?? '');
+        $conversation = $this->captureResponsesRequest($request, $payload, $lastUserText);
+        $hits = $this->memoryHits($request, $lastUserText);
+        $context = $this->context->buildHits($hits);
+
+        if ($context !== '') {
+            $payload['instructions'] = $this->context->injectInstructions(
+                isset($payload['instructions']) ? (string) $payload['instructions'] : null,
+                $context,
+            );
+        }
+
+        $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
+
+        if ($conversation !== null) {
+            $headers['X-Neiro-Conversation'] = (string) $conversation->id;
+        }
+
+        if (($payload['stream'] ?? false) === true) {
+            return $this->streamResponses($upstream, $payload, $hits, $conversation, $headers);
+        }
+
+        if ($upstream->mock) {
+            $data = $this->mock->openAiResponse($payload, $hits);
+            $this->recordAssistant($conversation, $this->responseOutputText($data), $data);
+
+            return response()->json($data, 200, $headers);
+        }
+
+        $response = Http::withHeaders($this->openAiHeaders($upstream))
+            ->withOptions(['http_errors' => false])
+            ->timeout($upstream->timeout)
+            ->post($upstream->url('responses'), $payload);
+
+        if ($response->failed()) {
+            return response($response->body(), $response->status(), [
+                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+                ...$headers,
+            ]);
+        }
+
+        $data = $response->json();
+
+        if (is_array($data)) {
+            $this->recordAssistant($conversation, $this->responseOutputText($data), $data);
+        }
+
+        return response($response->body(), $response->status(), [
+            'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+            ...$headers,
+        ]);
+    }
+
     public function messages(Request $request): Response
     {
         $payload = $request->json()->all();
@@ -361,6 +429,210 @@ class ProxyController extends Controller
                 $this->recordAssistant($conversation, $text, ['stream' => true]);
             }
         }, $response->status(), $streamHeaders);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<SearchHit>  $hits
+     * @param  array<string, string>  $headers
+     */
+    private function streamResponses(
+        UpstreamConfig $upstream,
+        array $payload,
+        array $hits,
+        ?Conversation $conversation,
+        array $headers,
+    ): Response {
+        $streamHeaders = [
+            'Content-Type' => 'text/event-stream; charset=utf-8',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+            'Connection' => 'keep-alive',
+            ...$headers,
+        ];
+
+        if ($upstream->mock) {
+            return response()->stream(function () use ($payload, $hits, $conversation): void {
+                $text = $this->mock->answer($payload, $hits);
+                $this->emitResponsesSse($text, (string) ($payload['model'] ?? 'neiro-mock'));
+                $this->recordAssistant($conversation, $text, ['mock' => true]);
+            }, 200, $streamHeaders);
+        }
+
+        $response = Http::withHeaders($this->openAiHeaders($upstream))
+            ->withOptions(['stream' => true, 'http_errors' => false])
+            ->timeout($upstream->timeout)
+            ->post($upstream->url('responses'), $payload);
+
+        if ($response->failed()) {
+            return response($response->body(), $response->status(), [
+                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+                ...$headers,
+            ]);
+        }
+
+        return response()->stream(function () use ($response, $conversation): void {
+            ignore_user_abort(true);
+            $body = $response->toPsrResponse()->getBody();
+            $buffer = '';
+            $text = '';
+
+            try {
+                while (! $body->eof()) {
+                    $chunk = $body->read(8192);
+
+                    if ($chunk === '') {
+                        usleep(5000);
+
+                        continue;
+                    }
+
+                    echo $chunk;
+                    @ob_flush();
+                    flush();
+                    $buffer .= $chunk;
+
+                    while (($position = strpos($buffer, "\n\n")) !== false) {
+                        $event = substr($buffer, 0, $position);
+                        $buffer = substr($buffer, $position + 2);
+                        $text .= $this->textFromResponsesEvent($event);
+                    }
+                }
+
+                if (trim($buffer) !== '') {
+                    $text .= $this->textFromResponsesEvent($buffer);
+                }
+            } finally {
+                $this->recordAssistant($conversation, $text, ['stream' => true]);
+            }
+        }, $response->status(), $streamHeaders);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function captureResponsesRequest(Request $request, array $payload, string $lastUserText): ?Conversation
+    {
+        if (! $this->settings->enabled || ! $this->settings->capture) {
+            return null;
+        }
+
+        $input = $payload['input'] ?? $payload['messages'] ?? [];
+        $messages = [];
+
+        if (is_string($input)) {
+            $messages[] = ['role' => 'user', 'content' => $input];
+        } elseif (is_array($input)) {
+            foreach ($input as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                $role = (string) ($item['role'] ?? '');
+
+                if (! in_array($role, ['user', 'assistant'], true)) {
+                    continue;
+                }
+
+                $content = is_string($item['content'] ?? null)
+                    ? $item['content']
+                    : $this->contentBlocksToText($item['content'] ?? $item['text'] ?? []);
+
+                if (trim($content) !== '') {
+                    $messages[] = ['role' => $role, 'content' => $content];
+                }
+            }
+        }
+
+        if ($messages === []) {
+            return null;
+        }
+
+        $result = $this->ingestor->ingest(
+            source: $this->sources->proxy(),
+            externalId: $this->sessionId($request, $payload),
+            messages: $messages,
+            attributes: [
+                'title' => Str::limit(trim($lastUserText), 120) ?: null,
+                'harness' => $this->harness($request),
+                'project' => $this->project($request, $payload),
+                'metadata' => array_filter([
+                    'model' => $payload['model'] ?? null,
+                    'api' => 'responses',
+                    'user_agent' => $request->userAgent(),
+                ]),
+            ],
+        );
+
+        return $result['conversation'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function responseOutputText(array $data): string
+    {
+        $parts = [];
+
+        foreach ((array) ($data['output'] ?? []) as $item) {
+            if (! is_array($item) || ($item['type'] ?? null) !== 'message') {
+                continue;
+            }
+
+            foreach ((array) ($item['content'] ?? []) as $block) {
+                if (is_array($block) && isset($block['text'])) {
+                    $parts[] = (string) $block['text'];
+                }
+            }
+        }
+
+        return trim(implode("\n", $parts));
+    }
+
+    private function textFromResponsesEvent(string $event): string
+    {
+        $text = '';
+
+        foreach (preg_split('/\r?\n/', $event) ?: [] as $line) {
+            if (! str_starts_with($line, 'data:')) {
+                continue;
+            }
+
+            $data = trim(substr($line, 5));
+
+            if ($data === '' || $data === '[DONE]') {
+                continue;
+            }
+
+            $json = json_decode($data, true);
+
+            if (! is_array($json)) {
+                continue;
+            }
+
+            if (($json['type'] ?? null) === 'response.output_text.delta') {
+                $text .= (string) ($json['delta'] ?? '');
+            }
+        }
+
+        return $text;
+    }
+
+    private function emitResponsesSse(string $text, string $model): void
+    {
+        $id = 'resp_neiro_'.Str::random(16);
+
+        echo 'event: response.created'."\n".'data: '.json_encode(['type' => 'response.created', 'response' => ['id' => $id, 'object' => 'response', 'status' => 'in_progress', 'model' => $model]], JSON_UNESCAPED_UNICODE)."\n\n";
+
+        foreach (mb_str_split($text, 48) as $piece) {
+            echo 'event: response.output_text.delta'."\n".'data: '.json_encode(['type' => 'response.output_text.delta', 'delta' => $piece], JSON_UNESCAPED_UNICODE)."\n\n";
+            @ob_flush();
+            flush();
+        }
+
+        echo 'event: response.completed'."\n".'data: '.json_encode(['type' => 'response.completed', 'response' => ['id' => $id, 'object' => 'response', 'status' => 'completed', 'model' => $model]], JSON_UNESCAPED_UNICODE)."\n\n";
+        @ob_flush();
+        flush();
     }
 
     /**

@@ -20,6 +20,8 @@ return [
 
     'proxy' => [
         'user_agent' => env('BRAIN_PROXY_USER_AGENT', 'NeiroBrain/1.0'),
+        'upstream' => env('BRAIN_PROXY_UPSTREAM', 'mock'),
+        'base_url' => env('BRAIN_PROXY_BASE_URL', ''),
     ],
 
     'demo' => [

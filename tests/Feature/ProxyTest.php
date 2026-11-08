@@ -82,6 +82,45 @@ class ProxyTest extends TestCase
         $this->assertSame(2, Message::query()->count());
     }
 
+    public function test_openai_responses_endpoint_works(): void
+    {
+        $this->seedKnowledge();
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer dev-proxy-token',
+            'X-Neiro-Session' => 'responses-session',
+        ])->postJson('/v1/responses', [
+            'model' => 'gpt-test',
+            'input' => 'Какой у меня стек?',
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('response', $response->json('object'));
+        $this->assertStringContainsString('Основной стек', $response->json('output.0.content.0.text'));
+        $this->assertGreaterThanOrEqual(1, (int) $response->headers->get('X-Neiro-Memory-Hits'));
+        $this->assertDatabaseHas('conversations', ['external_id' => 'proxy:responses-session']);
+    }
+
+    public function test_openai_responses_streaming_works(): void
+    {
+        $this->seedKnowledge();
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer dev-proxy-token',
+            'X-Neiro-Session' => 'responses-stream',
+        ])->postJson('/v1/responses', [
+            'model' => 'gpt-test',
+            'input' => 'Какой у меня стек?',
+            'stream' => true,
+        ]);
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('response.output_text.delta', $content);
+        $this->assertStringContainsString('response.completed', $content);
+        $this->assertSame(2, Message::query()->count());
+    }
+
     public function test_anthropic_messages_endpoint_works(): void
     {
         $this->seedKnowledge();

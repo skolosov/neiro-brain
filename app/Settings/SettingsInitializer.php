@@ -48,6 +48,17 @@ final class SettingsInitializer
             }
         }
 
+        if ($settingsClass === ProxySettings::class) {
+            $defaults['access_token'] = (string) config('brain.tokens.proxy', $defaults['access_token']);
+            $defaults['upstream'] = (string) config('brain.proxy.upstream', $defaults['upstream']);
+            $defaults['base_url'] = (string) config('brain.proxy.base_url', $defaults['base_url']);
+        }
+
+        if ($settingsClass === SecuritySettings::class) {
+            $defaults['mcp_token'] = (string) config('brain.tokens.mcp', $defaults['mcp_token']);
+            $defaults['api_token'] = (string) config('brain.tokens.api', $defaults['api_token']);
+        }
+
         $rows = DB::table('settings')->where('group', $settingsClass::group())->pluck('payload', 'name');
         $stored = [];
 

@@ -50,6 +50,42 @@ final class MockUpstream
      * @param  list<SearchHit>  $hits
      * @return array<string, mixed>
      */
+    public function openAiResponse(array $payload, array $hits): array
+    {
+        $text = $this->answer($payload, $hits);
+        $model = (string) ($payload['model'] ?? 'neiro-mock');
+
+        return [
+            'id' => 'resp_neiro_'.Str::random(16),
+            'object' => 'response',
+            'created_at' => time(),
+            'status' => 'completed',
+            'model' => $model,
+            'output' => [[
+                'id' => 'msg_neiro_'.Str::random(12),
+                'type' => 'message',
+                'status' => 'completed',
+                'role' => 'assistant',
+                'content' => [[
+                    'type' => 'output_text',
+                    'text' => $text,
+                    'annotations' => [],
+                ]],
+            ]],
+            'usage' => [
+                'input_tokens' => $this->estimateTokens($payload),
+                'output_tokens' => $this->estimateTextTokens($text),
+                'total_tokens' => $this->estimateTokens($payload) + $this->estimateTextTokens($text),
+            ],
+            'neiro' => ['memory_hits' => count($hits), 'mock' => true],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<SearchHit>  $hits
+     * @return array<string, mixed>
+     */
     public function anthropicMessage(array $payload, array $hits): array
     {
         $text = $this->answer($payload, $hits);
@@ -114,6 +150,32 @@ final class MockUpstream
      */
     private function lastUserQuestion(array $payload): string
     {
+        if (is_string($payload['input'] ?? null)) {
+            return trim($payload['input']);
+        }
+
+        if (is_array($payload['input'] ?? null)) {
+            foreach (array_reverse($payload['input']) as $item) {
+                if (! is_array($item) || ($item['role'] ?? null) !== 'user') {
+                    continue;
+                }
+
+                $content = $item['content'] ?? $item['text'] ?? '';
+
+                if (is_string($content)) {
+                    return trim($content);
+                }
+
+                if (is_array($content)) {
+                    foreach ($content as $block) {
+                        if (is_array($block) && isset($block['text'])) {
+                            return trim((string) $block['text']);
+                        }
+                    }
+                }
+            }
+        }
+
         $messages = $payload['messages'] ?? [];
 
         if (! is_array($messages)) {
