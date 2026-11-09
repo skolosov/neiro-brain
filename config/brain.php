@@ -13,6 +13,10 @@ return [
     |
     */
     'tokens' => [
+        // Единый токен на все входы: прокси, MCP и API. Если задан, принимается
+        // в любом скоупе, поэтому отдельные BRAIN_*_TOKEN нужны только если
+        // хочется держать разные значения.
+        'all' => env('BRAIN_TOKEN'),
         'proxy' => env('BRAIN_PROXY_TOKEN', 'dev-proxy-token'),
         'mcp' => env('BRAIN_MCP_TOKEN', 'dev-mcp-token'),
         'api' => env('BRAIN_API_TOKEN', 'dev-api-token'),

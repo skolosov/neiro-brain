@@ -17,12 +17,16 @@ use Throwable;
  *
  * The proxy accepts the token in either Authorization or x-api-key because
  * Anthropic-compatible clients send the latter.
+ *
+ * Besides the per-scope token, a single BRAIN_TOKEN (config brain.tokens.all)
+ * is accepted in every scope, so one value can be used for the proxy, MCP and
+ * the API at once.
  */
 class VerifyBrainToken
 {
     public function handle(Request $request, Closure $next, string $scope = 'api'): Response
     {
-        $expected = $this->expectedToken($scope);
+        $expected = $this->expectedTokens($scope);
         $proxyHeader = trim((string) $request->header('X-Neiro-Proxy-Token'));
 
         // Preferred for harnesses: the model provider key stays in Authorization,
@@ -31,35 +35,68 @@ class VerifyBrainToken
             ? $proxyHeader
             : ($request->bearerToken() ?: $request->header('x-api-key'));
 
-        if ($expected === null || $provided === null || ! hash_equals($expected, $provided)) {
+        if ($provided === null || $provided === '' || ! $this->matches($expected, $provided)) {
             return $this->unauthorized($request, $scope);
         }
 
         return $next($request);
     }
 
-    private function expectedToken(string $scope): ?string
+    /**
+     * Tokens accepted for a scope: the unified BRAIN_TOKEN first, then the
+     * scope's own token.
+     *
+     * @return list<string>
+     */
+    private function expectedTokens(string $scope): array
     {
+        $tokens = [];
+
+        $unified = trim((string) config('brain.tokens.all', ''));
+
+        if ($unified !== '') {
+            $tokens[] = $unified;
+        }
+
+        $scopeToken = null;
+
         try {
             app(SettingsInitializer::class)->ensure();
-            $token = match ($scope) {
+            $scopeToken = match ($scope) {
                 'proxy' => app(ProxySettings::class)->access_token,
                 'mcp' => app(SecuritySettings::class)->mcp_token,
                 default => app(SecuritySettings::class)->api_token,
             };
         } catch (Throwable) {
-            $token = null;
+            $scopeToken = null;
         }
 
-        $token = is_string($token) ? trim($token) : '';
+        $scopeToken = is_string($scopeToken) ? trim($scopeToken) : '';
 
-        if ($token !== '') {
-            return $token;
+        if ($scopeToken === '') {
+            $fallback = config('brain.tokens.'.$scope);
+            $scopeToken = is_string($fallback) ? trim($fallback) : '';
         }
 
-        $fallback = config('brain.tokens.'.$scope);
+        if ($scopeToken !== '') {
+            $tokens[] = $scopeToken;
+        }
 
-        return is_string($fallback) && $fallback !== '' ? $fallback : null;
+        return array_values(array_unique($tokens));
+    }
+
+    /**
+     * @param  list<string>  $expected
+     */
+    private function matches(array $expected, string $provided): bool
+    {
+        foreach ($expected as $token) {
+            if (hash_equals($token, $provided)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function unauthorized(Request $request, string $scope): Response
