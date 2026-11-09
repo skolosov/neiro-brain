@@ -26,6 +26,8 @@ Claude Code / Codex / Cursor / OpenAI SDK
 
 > Нужна одна страница без теории — **[docs/quickstart.md](docs/quickstart.md)**:
 > адреса, команды, токены, YAML для DSH и таблица частых ошибок.
+> macOS + Docker — **[docs/docker-macos.md](docs/docker-macos.md)**: nginx, php-fpm,
+> PostgreSQL и планировщик в контейнерах, DSH нативно.
 
 ## Что уже есть
 
