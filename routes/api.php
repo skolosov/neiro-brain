@@ -13,13 +13,21 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('brain.token:proxy')->group(function (): void {
+$proxyRoutes = static function (): void {
     Route::post('/v1/chat/completions', [ProxyController::class, 'chatCompletions']);
     Route::post('/v1/responses', [ProxyController::class, 'responses']);
     Route::post('/v1/messages', [ProxyController::class, 'messages']);
     Route::post('/v1/messages/count_tokens', [ProxyController::class, 'countTokens']);
     Route::get('/v1/models', [ProxyController::class, 'models']);
-});
+};
+
+Route::middleware('brain.token:proxy')->group($proxyRoutes);
+
+// Токен в адресе, как в git remote: http://host/<token>/v1.
+// Работает в харнессах, которые не умеют присылать свои заголовки.
+Route::prefix('{brainToken}')
+    ->middleware('brain.token:proxy')
+    ->group($proxyRoutes);
 
 /*
 |--------------------------------------------------------------------------

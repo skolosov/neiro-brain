@@ -309,7 +309,7 @@ class ProxyTest extends TestCase
         ]);
 
         $this->withHeaders(['x-api-key' => 'sk-harness-key'])
-            ->postJson('/v1/messages', [
+            ->postJson('/dev-proxy-token/v1/messages', [
                 'model' => 'deepseek-flash',
                 'max_tokens' => 8,
                 'messages' => [['role' => 'user', 'content' => 'ping']],
@@ -347,6 +347,13 @@ class ProxyTest extends TestCase
             ->assertOk();
 
         Http::assertSent(fn (Request $request): bool => (($request->data()['messages'][1]['content'][0]['text'] ?? null) === ''));
+    }
+
+    public function test_token_in_the_path_authorizes_the_proxy(): void
+    {
+        $this->getJson('/dev-proxy-token/v1/models')->assertOk();
+        $this->getJson('/not-a-token/v1/models')->assertUnauthorized();
+        $this->getJson('/v1/models')->assertUnauthorized();
     }
 
     public function test_proxy_rejects_invalid_token(): void

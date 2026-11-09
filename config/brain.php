@@ -23,9 +23,9 @@ return [
     ],
 
     'proxy' => [
-        // true — прокси принимает ключ харнесса как ключ провайдера и не требует
-        // токена Neiro Brain; ключ не сохраняется, а уходит upstream.
-        'open' => env('BRAIN_PROXY_OPEN', true),
+        // true — прокси пускает по одному ключу провайдера (sk-…) без токена
+        // Neiro Brain. По умолчанию выключено: токен берётся из адреса или заголовка.
+        'open' => env('BRAIN_PROXY_OPEN', false),
         'user_agent' => env('BRAIN_PROXY_USER_AGENT', 'NeiroBrain/1.0'),
         'upstream' => env('BRAIN_PROXY_UPSTREAM', 'mock'),
         'base_url' => env('BRAIN_PROXY_BASE_URL', ''),

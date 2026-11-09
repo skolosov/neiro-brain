@@ -790,10 +790,8 @@ class ProxyController extends Controller
 
         $providerKey = null;
 
-        $openProxy = (bool) config('brain.proxy.open', true);
-
-        if ($provided !== '' && ($hasProxyToken || ($openProxy && str_starts_with($provided, 'sk-')))) {
-            $providerKey = $provided !== $this->brainToken() ? $provided : null;
+        if ($provided !== '' && $provided !== $this->brainToken()) {
+            $providerKey = $provided;
         }
 
         $requestedUpstream = $request->header('X-Neiro-Upstream');

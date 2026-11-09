@@ -34,19 +34,27 @@ class VerifyBrainToken
             ? $proxyHeader
             : (string) ($request->bearerToken() ?: $request->header('x-api-key'));
 
-        // Прозрачный прокси: ключ провайдера (sk-…) клиент присылает вместо
-        // токена Neiro Brain, сервер его не хранит, а передаёт upstream.
-        if ($scope === 'proxy' && (bool) config('brain.proxy.open', true) && $this->looksLikeProviderKey($provided)) {
+        $expected = $this->expectedTokens($scope);
+
+        // Токен в адресе — как в git remote: http://host/<token>/v1 или
+        // basic-auth userinfo http://<token>@host/v1.
+        $addressToken = trim((string) ($request->route('brainToken') ?? $request->getUser() ?? ''));
+
+        if ($addressToken !== '' && $this->matches($expected, $addressToken)) {
             return $next($request);
         }
 
-        $expected = $this->expectedTokens($scope);
-
-        if ($provided === '' || ! $this->matches($expected, $provided)) {
-            return $this->unauthorized($request, $scope);
+        if ($provided !== '' && $this->matches($expected, $provided)) {
+            return $next($request);
         }
 
-        return $next($request);
+        // Прозрачный прокси: вместо токена Neiro Brain клиент прислал ключ
+        // провайдера (sk-…), сервер его не хранит, а передаёт upstream.
+        if ($scope === 'proxy' && (bool) config('brain.proxy.open', false) && $this->looksLikeProviderKey($provided)) {
+            return $next($request);
+        }
+
+        return $this->unauthorized($request, $scope);
     }
 
     private function looksLikeProviderKey(string $token): bool
