@@ -7,6 +7,7 @@ namespace App\Mcp\Servers;
 use App\Mcp\Prompts\AboutMePrompt;
 use App\Mcp\Resources\KnowledgeEntryResource;
 use App\Mcp\Resources\KnowledgeIndexResource;
+use App\Mcp\Tools\DeleteKnowledgeTool;
 use App\Mcp\Tools\GetKnowledgeTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ProjectContextTool;
@@ -22,7 +23,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('neiro-brain')]
 #[Version('1.0.0')]
-#[Instructions('Личная база знаний пользователя. Перед вопросами о пользователе, его компании, проектах, стеке, предпочтениях и прошлых решениях вызывай search_knowledge. Используй get_knowledge для полного текста и remember_knowledge, когда пользователь просит запомнить факт.')]
+#[Instructions('Личная база знаний пользователя. Перед вопросами о пользователе, его компании, проектах, стеке, предпочтениях и прошлых решениях вызывай search_knowledge. Используй get_knowledge для полного текста, remember_knowledge — когда просят запомнить (укажи scope: profile, environment или project), delete_knowledge — когда просят убрать карточку.')]
 class KnowledgeServer extends Server
 {
     /**
@@ -33,6 +34,7 @@ class KnowledgeServer extends Server
         SearchKnowledgeTool::class,
         GetKnowledgeTool::class,
         RememberKnowledgeTool::class,
+        DeleteKnowledgeTool::class,
         ListProjectsTool::class,
         RecentKnowledgeTool::class,
     ];

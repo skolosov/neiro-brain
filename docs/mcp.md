@@ -33,8 +33,27 @@ Local: `php artisan mcp:start knowledge`
 | `content` | string, required |
 | `kind` | string |
 | `project` | string |
+| `scope` | `profile` \| `project` \| `environment` |
+| `theme` | string, до 64 символов |
 | `tags` | string[] |
 | `importance` | int 1–5 |
+
+`scope` решает, куда карточка дойдёт: `profile` и `environment` видны в чате о
+любом проекте, `project` — только в своём (и тогда `project` обязателен). Если
+`scope` не передан: с проектом — `project`, без проекта — `profile`.
+
+### `delete_knowledge`
+
+Убирает карточки по id (из `search_knowledge` или `recent_knowledge`).
+
+| Аргумент | Тип |
+|---|---|
+| `ids` | int[], 1–50, required |
+| `mode` | `archive` (по умолчанию) \| `delete` |
+
+`archive` прячет карточку из поиска и контекста, но оставляет её в админке —
+её можно вернуть, поменяв статус. `delete` стирает запись навсегда вместе с
+чанками и терминами индекса.
 
 ### `list_projects`
 

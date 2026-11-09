@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\KnowledgeKind;
 use App\Mcp\Prompts\AboutMePrompt;
 use App\Mcp\Servers\KnowledgeServer;
+use App\Mcp\Tools\DeleteKnowledgeTool;
 use App\Mcp\Tools\GetKnowledgeTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\RememberKnowledgeTool;
@@ -84,6 +85,61 @@ class McpTest extends TestCase
 
         $search = KnowledgeServer::tool(SearchKnowledgeTool::class, ['query' => 'Pest тесты']);
         $search->assertOk()->assertSee('Pest');
+    }
+
+    public function test_remember_tool_stores_environment_scope(): void
+    {
+        $response = KnowledgeServer::tool(RememberKnowledgeTool::class, [
+            'title' => 'Окружение на Mac',
+            'content' => 'Пользователь работает на Mac, проекты лежат в /Users/skolosov/Desktop/www.',
+            'kind' => 'process',
+            'scope' => 'environment',
+            'importance' => 5,
+        ]);
+
+        $response->assertOk()->assertSee('Создана');
+
+        $this->assertDatabaseHas('knowledge_entries', [
+            'title' => 'Окружение на Mac',
+            'scope' => 'environment',
+            'project' => null,
+        ]);
+    }
+
+    public function test_delete_tool_archives_by_default_and_hides_card_from_search(): void
+    {
+        $id = $this->seedEntry();
+
+        $response = KnowledgeServer::tool(DeleteKnowledgeTool::class, ['ids' => [$id]]);
+
+        $response->assertOk()->assertSee('архив');
+        $this->assertDatabaseHas('knowledge_entries', ['id' => $id, 'status' => 'archived']);
+
+        $search = KnowledgeServer::tool(SearchKnowledgeTool::class, ['query' => 'основной стек Laravel']);
+        $search->assertOk()->assertDontSee('Основной стек');
+    }
+
+    public function test_delete_tool_removes_card_and_its_index(): void
+    {
+        $id = $this->seedEntry();
+
+        $response = KnowledgeServer::tool(DeleteKnowledgeTool::class, [
+            'ids' => [$id],
+            'mode' => 'delete',
+        ]);
+
+        $response->assertOk()->assertSee('Удалено');
+        $this->assertDatabaseMissing('knowledge_entries', ['id' => $id]);
+        $this->assertFalse(
+            KnowledgeChunk::query()->where('entry_id', $id)->exists(),
+        );
+    }
+
+    public function test_delete_tool_reports_missing_ids(): void
+    {
+        $response = KnowledgeServer::tool(DeleteKnowledgeTool::class, ['ids' => [999999]]);
+
+        $response->assertHasErrors(['не найдены']);
     }
 
     public function test_projects_tool_lists_projects(): void
