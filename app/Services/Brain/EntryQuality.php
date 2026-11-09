@@ -31,6 +31,10 @@ final class EntryQuality
         '/^(итак|в\s+итоге|короче)\b/u',
         '/^(продолжи|продолжить|давай|давайте)\b/u',
         '/^(спасибо|благодарю|ок|окей|хорошо|понял|поняла|принято)\b/u',
+        '/^(сделай|добавь|покажи|напиши|проверь|исправь|убери|посмотри|найди|запусти)\b/u',
+        '/\b(хочу|хотел бы|надо|нужно)\s+(что\s?бы|чтобы)\s+ты\b/u',
+        '/^(current|this snapshot|note:|todo|file|path|config)\b/u',
+        '/^<[a-z]/u',
     ];
 
     /** Content that is really code or a shell transcript. */
@@ -89,7 +93,17 @@ final class EntryQuality
             return 'too_short';
         }
 
-        if ($entry->importance < 2) {
+        // Titles that are cut mid-word, start with a bullet or contain raw
+        // markup are transcript fragments, not knowledge.
+        if (str_contains($title, '…') || preg_match('/^[-–—*•#>|`]/u', $title) === 1) {
+            return 'fragment';
+        }
+
+        if (preg_match('/[{}<>]{2,}|=>|<\?php/u', $title) === 1) {
+            return 'fragment';
+        }
+
+        if ($entry->importance < 3) {
             return 'low_importance';
         }
 

@@ -120,46 +120,74 @@ final class HeuristicExtractor
                 continue;
             }
 
+            // Transcript artefacts: bullet lists, headings, key-value notes and
+            // anything already truncated by an earlier summarizer.
+            if (preg_match('/^[-–—*•#>|]/u', $part) === 1) {
+                continue;
+            }
+
+            if (preg_match('/^[\p{L} .]{2,20}:\s/u', $part) === 1) {
+                continue;
+            }
+
+            if (str_contains($part, '…') || str_contains($part, '...')) {
+                continue;
+            }
+
+            if (preg_match('/^[A-Za-z .]+$/u', $part) === 1 && ! preg_match('/[А-Яа-яЁё]/u', $part)) {
+                continue;
+            }
+
             $sentences[] = $part;
         }
 
         return array_values(array_unique($sentences));
     }
 
+    /**
+     * A sentence becomes a card only when it clearly speaks about the user's
+     * own setup. Everything else is transcript noise: task instructions,
+     * pasted context, tool output and English boilerplate from harnesses.
+     */
     private function score(string $sentence, Message $message): float
     {
         $lower = mb_strtolower($sentence);
-        $score = 1.0;
+        $score = 0.0;
 
         if ($message->role === 'user') {
-            $score += 0.8;
+            $score += 0.5;
         }
 
-        if (preg_match('/(^|\s)(я|мы|мой|моя|мои|наш|наша|наши|мне|меня)\s/u', $lower) === 1) {
-            $score += 1.2;
+        $selfReference = preg_match('/(^|\s)(я|мы|мой|моя|мои|моё|наш|наша|наши|мне|меня|нас)\s/u', $lower) === 1;
+        $preference = preg_match('/люблю|предпочитаю|нравится|не люблю|бесит|привык|удобн|использую|работаю|пишу|выбираю|хочу|планирую/iu', $lower) === 1;
+        $decision = preg_match('/решили|выбрали|договорились|приняли|отказались|пришли к|остановились на/iu', $lower) === 1;
+        $team = preg_match('/компани|команда|клиент|заказчик|продукт|проект/iu', $lower) === 1;
+
+        // No self-reference and no decision — this is not knowledge about the
+        // user, whatever else it contains.
+        if (! $selfReference && ! $decision && ! $preference) {
+            return 0.0;
         }
 
-        foreach ([
-            'люблю', 'предпочитаю', 'нравится', 'не люблю', 'бесит', 'привык',
-            'использую', 'работаю', 'пишу', 'выбираю', 'хочу', 'планирую',
-            'решили', 'выбрали', 'договорились', 'приняли', 'отказались',
-            'проект', 'компания', 'клиент', 'команда', 'продукт', 'сервис',
-        ] as $marker) {
-            if (str_contains($lower, $marker)) {
-                $score += 0.55;
-            }
-        }
+        $score += $selfReference ? 1.2 : 0.0;
+        $score += $preference ? 1.0 : 0.0;
+        $score += $decision ? 1.0 : 0.0;
+        $score += $team ? 0.3 : 0.0;
 
         if (preg_match('/\b(laravel|php|postgres|postgresql|docker|vue|react|mcp|bm25|llm|moonshine|redis|nginx|1с)\b/u', $lower) === 1) {
-            $score += 0.7;
+            $score += 0.6;
         }
 
         if (str_ends_with($sentence, '?')) {
             $score -= 1.4;
         }
 
-        if (preg_match('/^(конечно|вот|пример|давай|итак|например|смотри)\b/u', $lower) === 1) {
-            $score -= 1.2;
+        if (preg_match('/^(конечно|вот|пример|давай|итак|например|смотри|сделай|добавь|покажи|напиши|проверь)\b/u', $lower) === 1) {
+            $score -= 1.6;
+        }
+
+        if (preg_match('/^(current|this snapshot|note:|todo|file|path|config|<|#)/u', $lower) === 1) {
+            return 0.0;
         }
 
         return round($score, 2);
@@ -237,9 +265,22 @@ final class HeuristicExtractor
 
     private function title(string $sentence): string
     {
-        $title = preg_replace('/^(я|мы|мне|меня|у меня|у нас)\s+/iu', '', $sentence) ?? $sentence;
-        $title = rtrim($title, ' .!?…');
-        $title = Text::limit($title, 90);
+        $clean = trim(preg_replace('/^[\s\-–—*•\d.)"«]+/u', '', $sentence) ?? $sentence);
+
+        // A title is a phrase, not half a sentence: cut at punctuation or dash
+        // instead of truncating mid-word.
+        $parts = preg_split('/[,:;—–]| - /u', $clean) ?: [$clean];
+        $title = rtrim(trim($parts[0]), ' .!?…');
+
+        if (mb_strlen($title) < 12) {
+            $head = mb_substr($clean, 0, 70);
+            $space = mb_strrpos($head, ' ');
+            $title = rtrim($space !== false ? mb_substr($head, 0, $space) : $head, ' .!?…');
+        }
+
+        $title = mb_strlen($title) > 80
+            ? rtrim(mb_substr($title, 0, (int) mb_strrpos(mb_substr($title, 0, 80), ' ')), ' .!?…')
+            : $title;
 
         return mb_strtoupper(mb_substr($title, 0, 1)).mb_substr($title, 1);
     }
