@@ -214,6 +214,7 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeAnthropic($payload);
+        $payload['messages'] = $this->sanitizeAnthropicMessages($payload['messages']);
 
         $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
 
@@ -807,6 +808,35 @@ class ProxyController extends Controller
             $providerKey,
             $protocol,
         );
+    }
+
+    /**
+     * Strict gateways reject a null text value inside a content block, and the
+     * harness may produce one when it replays an interrupted assistant turn.
+     * Normalizing it here keeps the proxy transparent for the client.
+     *
+     * @param  array<int, mixed>  $messages
+     * @return array<int, mixed>
+     */
+    private function sanitizeAnthropicMessages(array $messages): array
+    {
+        foreach ($messages as $index => $message) {
+            if (! is_array($message) || ! is_array($message['content'] ?? null)) {
+                continue;
+            }
+
+            foreach ($message['content'] as $blockIndex => $block) {
+                if (! is_array($block)) {
+                    continue;
+                }
+
+                if (($block['type'] ?? null) === 'text' && array_key_exists('text', $block) && $block['text'] === null) {
+                    $messages[$index]['content'][$blockIndex]['text'] = '';
+                }
+            }
+        }
+
+        return $messages;
     }
 
     private function brainToken(): string
