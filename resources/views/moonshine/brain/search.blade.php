@@ -94,9 +94,24 @@
                 <div class="nb-empty-hint">{{ $result['empty_reason'] ?? 'Ничего не найдено.' }}</div>
             @endif
 
+            @php
+                // The open card is shown in the right-hand panel in full, so
+                // repeating it in the list would only waste the reader's eye.
+                $listCards = array_values(array_filter(
+                    $result['cards'],
+                    fn (array $card): bool => $card['id'] !== $activeId,
+                ));
+            @endphp
+
+            @if ($selected !== null && $listCards === [])
+                <div class="nb-empty-hint">
+                    Это единственная карточка по фильтру. Её полный текст — справа.
+                </div>
+            @endif
+
             <div class="nb-results">
-                @foreach ($result['cards'] as $card)
-                    @include('moonshine.brain.partials.knowledge-card', ['card' => $card, 'mode' => $activeId === $card['id'] ? 'row' : 'grid'])
+                @foreach ($listCards as $card)
+                    @include('moonshine.brain.partials.knowledge-card', ['card' => $card, 'mode' => 'grid'])
                 @endforeach
             </div>
         </div>
@@ -117,18 +132,20 @@
                 </div>
             @endif
 
-            <div class="nb-peek">
-                <h3>Как устроен поиск</h3>
-                <p class="nb-peek-text">
-                    Карточка — это тема: заголовок, краткое описание (что она утверждает)
-                    и полный текст. Поиск идёт по основам слов (Snowball, ru+en) через BM25
-                    и отдаёт сначала описания — полный текст читается только для нужных карточек.
-                    Поэтому вся база не перечитывается целиком.
-                </p>
-                <div class="nb-graph-mini">
-                    <a href="{{ $graphUrl }}">Открыть граф →</a>
+            @if ($selected === null)
+                <div class="nb-peek">
+                    <h3>Как устроен поиск</h3>
+                    <p class="nb-peek-text">
+                        Карточка — это тема: заголовок, краткое описание (что она утверждает)
+                        и полный текст. Поиск идёт по основам слов (Snowball, ru+en) через BM25
+                        и отдаёт сначала описания — полный текст читается только для нужных карточек.
+                        Поэтому вся база не перечитывается целиком.
+                    </p>
+                    <div class="nb-graph-mini">
+                        <a href="{{ $graphUrl }}">Открыть граф →</a>
+                    </div>
                 </div>
-            </div>
+            @endif
         </aside>
     </div>
 </div>

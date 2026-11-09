@@ -208,7 +208,13 @@
 
     /* Two-column "list + detail" search page */
     .nb-search-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-    @media (min-width: 1280px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 24rem; align-items: start; } }
+    /* The open card is read here, so the panel gets room for a comfortable line
+       length; the list beside it is only a table of contents. */
+    @media (min-width: 1280px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 34rem; align-items: start; } }
+    @media (min-width: 1680px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 42rem; align-items: start; } }
     .nb-search-main { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
     .nb-search-side { display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 1rem; }
+    .nb-search-side .nb-peek-card { padding: 1.1rem 1.3rem; }
+    .nb-search-side .nb-peek-body { font-size: .92rem; line-height: 1.65; max-width: 68ch; }
+    .nb-search-side .nb-peek-lead { font-size: .95rem; line-height: 1.6; max-width: 68ch; }
 </style>
