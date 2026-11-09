@@ -148,12 +148,12 @@ class KnowledgeCardsTest extends TestCase
 
         // Broader themes come first: "Архитектура" outranks the narrower "Поиск".
         $this->assertSame(['Архитектура', 'Поиск'], $topics->of($tagged));
-        $this->assertSame(['Стиль работы'], $topics->of($untagged));
+        $this->assertSame(['Стиль'], $topics->of($untagged));
 
         $counts = $topics->counts();
 
         $this->assertSame(1, $counts['Поиск']);
-        $this->assertSame(1, $counts['Стиль работы']);
+        $this->assertSame(1, $counts['Стиль']);
     }
 
     public function test_graph_links_projects_topics_and_entries(): void
@@ -170,12 +170,39 @@ class KnowledgeCardsTest extends TestCase
         $types = array_column($graph['nodes'], 'type');
         $ids = array_column($graph['nodes'], 'id');
 
-        $this->assertContains('project', $types);
         $this->assertContains('topic', $types);
         $this->assertContains('entry', $types);
-        $this->assertContains('pneiro-brain', $ids);
         $this->assertContains('tПоиск', $ids);
         $this->assertContains('e'.$entry->id, $ids);
+
+        // One project is not a comparison: it would turn the graph into a star,
+        // so the project layer appears only from the second project on.
+        $this->assertNotContains('project', $types);
+    }
+
+    public function test_graph_shows_the_project_layer_for_several_projects(): void
+    {
+        $this->write(
+            'Стек Sklad',
+            'В Sklad выбрали Laravel 13 и PostgreSQL для учёта остатков на складе.',
+            kind: 'stack',
+            project: 'Sklad',
+            tags: ['laravel'],
+        );
+
+        $this->write(
+            'Стек CRM',
+            'В CRM выбрали Vue 3 и Inertia, чтобы не плодить отдельный API-слой.',
+            kind: 'stack',
+            project: 'CRM',
+            tags: ['vue'],
+        );
+
+        $graph = app(BrainGraph::class)->build()['graph']->toArray();
+        $ids = array_column($graph['nodes'], 'id');
+
+        $this->assertContains('pSklad', $ids);
+        $this->assertContains('pCRM', $ids);
     }
 
     public function test_search_page_shows_cards_topics_and_entry_panel(): void
@@ -207,10 +234,10 @@ class KnowledgeCardsTest extends TestCase
         );
 
         $this->actingAs($this->admin(), 'moonshine')
-            ->get(route('moonshine.page', ['pageUri' => 'search-page', 'topic' => 'Интеграции']))
+            ->get(route('moonshine.page', ['pageUri' => 'search-page', 'topic' => 'Прокси']))
             ->assertOk()
             ->assertSee('Импорт из 1С')
-            ->assertSee('Тема «Интеграции»');
+            ->assertSee('Тема «Прокси»');
     }
 
     public function test_graph_page_renders_canvas_and_data(): void
@@ -255,7 +282,7 @@ class KnowledgeCardsTest extends TestCase
             ->get(route('moonshine.page', ['pageUri' => 'projects-page']))
             ->assertOk()
             ->assertSee('Sklad')
-            ->assertSee('Интеграции');
+            ->assertSee('Прокси');
     }
 
     public function test_pages_render_on_an_empty_base(): void

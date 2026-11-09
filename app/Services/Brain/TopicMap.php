@@ -11,93 +11,197 @@ use Illuminate\Support\Str;
 /**
  * Topics are the middle layer between projects and single cards.
  *
- * An entry lands in a topic through its tags; when an entry has no tags the
- * topic is derived from its kind (решения, стек, стиль работы…), so every card
- * belongs to at least one theme and the graph never shows loose dots.
+ * The extractor writes free-form tags ("монолит", "визуализация", "retention"),
+ * which is great for search and useless for navigation: a hundred cards would
+ * produce a hundred one-off labels. This class maps them onto a small canonical
+ * set, so the graph shows a dozen real themes instead of a star of tags.
  */
 final class TopicMap
 {
-    /** Normalized synonyms for the most common tags. */
+    /** Canonical topic per normalized tag. */
     private const ALIASES = [
-        'laravel' => 'Laravel',
-        'php' => 'PHP',
-        'postgres' => 'PostgreSQL',
-        'postgresql' => 'PostgreSQL',
-        'pgsql' => 'PostgreSQL',
-        'redis' => 'Redis',
-        'docker' => 'Docker',
-        'vue' => 'Vue',
-        'vue3' => 'Vue',
-        'mcp' => 'MCP',
-        'bm25' => 'Поиск',
-        'search' => 'Поиск',
-        'поиск' => 'Поиск',
+        // Стек и технологии
+        'laravel' => 'Стек',
+        'php' => 'Стек',
+        'postgres' => 'Данные',
+        'postgresql' => 'Данные',
+        'pgsql' => 'Данные',
+        'redis' => 'Стек',
+        'docker' => 'Стек',
+        'vue' => 'Стек',
+        'vue3' => 'Стек',
+        'стек' => 'Стек',
+        'опенсервер' => 'Стек',
+        'openserver' => 'Стек',
+        'ospanel' => 'Стек',
+        'окружение' => 'Стек',
+        'windows' => 'Стек',
+        'linux' => 'Стек',
+
+        // Архитектура
         'архитектура' => 'Архитектура',
         'architecture' => 'Архитектура',
         'микросервисы' => 'Архитектура',
         'микросервис' => 'Архитектура',
         'монолит' => 'Архитектура',
-        'тесты' => 'Тесты',
-        'тестирование' => 'Тесты',
-        'tests' => 'Тесты',
-        'pest' => 'Тесты',
-        'phpunit' => 'Тесты',
-        'деплой' => 'Деплой',
-        'deploy' => 'Деплой',
-        'ci' => 'Деплой',
-        'openser' => 'Окружение',
-        'openserver' => 'Окружение',
-        'ospanel' => 'Окружение',
-        'окружение' => 'Окружение',
-        'windows' => 'Окружение',
-        'api' => 'API',
-        'прокси' => 'Прокси',
-        'proxy' => 'Прокси',
-        'openai' => 'LLM',
-        'deepseek' => 'LLM',
-        'llm' => 'LLM',
-        'claude' => 'LLM',
-        'процессы' => 'Процессы',
-        'process' => 'Процессы',
-        'коммуникация' => 'Процессы',
-        'preferences' => 'Предпочтения',
-        'preference' => 'Предпочтения',
-        'profile' => 'Профиль',
-        'команда' => 'Команда',
-        '1с' => '1С',
-        '1c' => '1С',
-        'bitrix' => '1С',
-        'интеграции' => 'Интеграции',
-        'интеграция' => 'Интеграции',
-        'идемпотентность' => 'Интеграции',
+        'design' => 'Архитектура',
+        'frontend' => 'Архитектура',
+        'backend' => 'Архитектура',
+
+        // Поиск
+        'bm25' => 'Поиск',
+        'search' => 'Поиск',
+        'поиск' => 'Поиск',
+        'индекс' => 'Поиск',
+        'индексация' => 'Поиск',
+
+        // Данные и приватность
+        'хранение' => 'Данные',
+        'хранение данных' => 'Данные',
+        'retention' => 'Данные',
+        'ретеншн' => 'Данные',
+        'приватность' => 'Данные',
+        'privacy' => 'Данные',
+        'бд' => 'Данные',
+        'миграции' => 'Данные',
+
+        // Карточки и интерфейс
+        'знания' => 'Карточки',
+        'карточки' => 'Карточки',
+        'карточка' => 'Карточки',
+        'темы' => 'Карточки',
+        'тема' => 'Карточки',
+        'граф' => 'Карточки',
+        'graph' => 'Карточки',
+        'визуализация' => 'Карточки',
+        'canvas' => 'Карточки',
+        'интерфейс' => 'Карточки',
+        'ui' => 'Карточки',
+        'ux' => 'Карточки',
+        'база знаний' => 'Карточки',
+
+        // Админка и настройки
         'админка' => 'Админка',
         'moonshine' => 'Админка',
-        'стиль' => 'Стиль работы',
-        'стиль работы' => 'Стиль работы',
+        'настройки' => 'Админка',
+        'settings' => 'Админка',
+
+        // Процессы
+        'cron' => 'Процессы',
+        'синхронизация' => 'Процессы',
+        'суммаризация' => 'Процессы',
+        'процессы' => 'Процессы',
+        'process' => 'Процессы',
+        'качество' => 'Процессы',
+        'качество данных' => 'Процессы',
+        'коммуникация' => 'Процессы',
+
+        // Прокси и интеграции
+        'прокси' => 'Прокси',
+        'proxy' => 'Прокси',
+        'api' => 'Прокси',
+        'харнессы' => 'Прокси',
+        'харнесс' => 'Прокси',
+        'mcp' => 'Прокси',
+        'интеграции' => 'Прокси',
+        'интеграция' => 'Прокси',
+        'идемпотентность' => 'Прокси',
+
+        // LLM
+        'llm' => 'LLM',
+        'openai' => 'LLM',
+        'deepseek' => 'LLM',
+        'claude' => 'LLM',
+        'модель' => 'LLM',
+        'ai' => 'LLM',
+
+        // Стиль и тесты
+        'стиль' => 'Стиль',
+        'стиль работы' => 'Стиль',
+        'тесты' => 'Стиль',
+        'тестирование' => 'Стиль',
+        'tests' => 'Стиль',
+        'pest' => 'Стиль',
+        'phpunit' => 'Стиль',
+        'код' => 'Стиль',
+        'конвенции' => 'Стиль',
+
+        // Люди и компания
+        'команда' => 'Команда',
+        'компания' => 'Команда',
+        'профиль' => 'Команда',
+        'profile' => 'Команда',
+        'предпочтения' => 'Предпочтения',
+        'preference' => 'Предпочтения',
+        'предпочтение' => 'Предпочтения',
+        '1с' => 'Интеграции',
+        '1c' => 'Интеграции',
+        'bitrix' => 'Интеграции',
+        'проект' => 'Проекты',
+        'проекты' => 'Проекты',
+    ];
+
+    /** Substring rules for tags the extractor invents on the fly. */
+    private const CONTAINS = [
+        'архитектур' => 'Архитектура',
+        'микросервис' => 'Архитектура',
+        'монолит' => 'Архитектура',
+        'поиск' => 'Поиск',
+        'bm25' => 'Поиск',
+        'индекс' => 'Поиск',
+        'хранен' => 'Данные',
+        'приватн' => 'Данные',
+        'карточ' => 'Карточки',
+        'граф' => 'Карточки',
+        'визуал' => 'Карточки',
+        'интерфейс' => 'Карточки',
+        'знани' => 'Карточки',
+        'админ' => 'Админка',
+        'настройк' => 'Админка',
+        'синхрон' => 'Процессы',
+        'суммариз' => 'Процессы',
+        'качеств' => 'Процессы',
+        'прокси' => 'Прокси',
+        'харнесс' => 'Прокси',
+        'интеграц' => 'Прокси',
+        'стил' => 'Стиль',
+        'тест' => 'Стиль',
+        'стек' => 'Стек',
+        'окружен' => 'Стек',
+        'команд' => 'Команда',
+        'компани' => 'Команда',
+        'проект' => 'Проекты',
+        'lld' => 'LLM',
+        'llm' => 'LLM',
+        'модел' => 'LLM',
     ];
 
     /**
      * Topics of one entry, most significant first.
      *
-     * A card gets at most two topics: a card tagged "lagging, postgres, vue,
-     * стек" is about the stack, not about four unrelated themes. Extra tags stay
-     * on the card for search — they just don't become graph nodes.
+     * Two themes per card is the sweet spot: the card stays findable through its
+     * full tag list, but the graph does not explode into dozens of labels.
      *
      * @return list<string>
      */
     public function of(KnowledgeEntry $entry): array
     {
         $topics = [];
+        $projectKey = $this->key((string) $entry->project);
 
         foreach ($entry->tags ?? [] as $position => $tag) {
+            // A tag repeating the project name is not a theme: the project layer
+            // of the graph already shows it, so it would duplicate the hub.
+            if ($projectKey !== '' && $this->key((string) $tag) === $projectKey) {
+                continue;
+            }
+
             $topic = $this->normalize((string) $tag);
 
             if ($topic === '') {
                 continue;
             }
 
-            // Keep the first raw position so equally important themes stay in
-            // the order the extractor wrote them.
             $topics[$topic] ??= [
                 'priority' => $this->priority($topic),
                 'position' => $position,
@@ -110,20 +214,12 @@ final class TopicMap
 
         uasort($topics, fn (array $left, array $right): int => [$right['priority'], $left['position']] <=> [$left['priority'], $right['position']]);
 
-        return array_slice(array_keys($topics), 0, 3);
+        return array_slice(array_keys($topics), 0, 2);
     }
 
-    /**
-     * Broader themes beat narrow ones when a card can only carry two.
-     */
-    private function priority(string $topic): int
+    private function key(string $value): string
     {
-        return match (true) {
-            in_array($topic, ['Архитектура', 'Процессы', 'Предпочтения', 'Профиль', 'Компания', 'Стиль работы'], true) => 5,
-            in_array($topic, ['Стек', 'Поиск', 'Тесты', 'Деплой', 'Интеграции', 'LLM', 'Админка'], true) => 4,
-            mb_strlen($topic) <= 4 => 2,
-            default => 3,
-        };
+        return mb_strtolower(preg_replace('/[^\p{L}\p{N}]+/u', '', $value) ?? $value);
     }
 
     /**
@@ -152,7 +248,7 @@ final class TopicMap
      *
      * @return Collection<string, int>
      */
-    public function counts(int $limit = 40, bool $approvedOnly = true): Collection
+    public function counts(int $limit = 40, bool $approvedOnly = true, int $min = 1): Collection
     {
         $entries = KnowledgeEntry::query()
             ->when($approvedOnly, fn ($query) => $query->approved())
@@ -161,7 +257,9 @@ final class TopicMap
         $counts = [];
 
         foreach ($this->group($entries) as $topic => $items) {
-            $counts[$topic] = $items->count();
+            if ($items->count() >= $min) {
+                $counts[$topic] = $items->count();
+            }
         }
 
         arsort($counts);
@@ -173,8 +271,7 @@ final class TopicMap
      * Entries of one topic.
      *
      * Filtering happens in PHP because tags are stored as the user wrote them
-     * ("Интеграции", "интеграции") while topics are normalized — a JSON query
-     * would be case-sensitive and silently miss half the cards.
+     * and topics are canonical — a JSON query would miss most of the cards.
      *
      * @return Collection<int, KnowledgeEntry>
      */
@@ -192,6 +289,9 @@ final class TopicMap
             ->values();
     }
 
+    /**
+     * Map a free-form tag onto a canonical topic.
+     */
     public function normalize(string $tag): string
     {
         $tag = trim($tag);
@@ -200,27 +300,43 @@ final class TopicMap
             return '';
         }
 
-        $key = mb_strtolower(preg_replace('/[^\p{L}\p{N}+#]+/u', '', $tag) ?? $tag);
+        $key = mb_strtolower(preg_replace('/[^\p{L}\p{N}+#]+/u', ' ', $tag) ?? $tag);
+        $key = trim(preg_replace('/\s+/u', ' ', $key) ?? $key);
 
         if (isset(self::ALIASES[$key])) {
             return self::ALIASES[$key];
         }
 
+        foreach (self::CONTAINS as $needle => $topic) {
+            if (str_contains($key, $needle)) {
+                return $topic;
+            }
+        }
+
         return Str::ucfirst($tag);
+    }
+
+    private function priority(string $topic): int
+    {
+        return match ($topic) {
+            'Архитектура', 'Процессы', 'Предпочтения', 'Команда', 'Карточки' => 5,
+            'Поиск', 'Прокси', 'Админка', 'Данные', 'Стиль', 'LLM' => 4,
+            default => 3,
+        };
     }
 
     private function kindTopic(KnowledgeEntry $entry): string
     {
         return match ($entry->kind?->value) {
-            'decision' => 'Решения',
+            'decision' => 'Архитектура',
             'stack' => 'Стек',
-            'style' => 'Стиль работы',
+            'style' => 'Стиль',
             'process' => 'Процессы',
             'preference' => 'Предпочтения',
-            'profile', 'person' => 'Профиль',
-            'company' => 'Компания',
+            'profile', 'person' => 'Команда',
+            'company' => 'Команда',
             'project' => 'Проекты',
-            default => 'Факты',
+            default => 'Карточки',
         };
     }
 }

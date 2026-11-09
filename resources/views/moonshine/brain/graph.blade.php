@@ -10,8 +10,8 @@
         <div>
             <h1 class="nb-title">Граф знаний</h1>
             <p class="nb-subtitle">
-                Узлы: проекты и записи. Связи: принадлежность проекту, общие теги и общие редкие слова.
-                На графе {{ $stats['nodes'] }} узлов и {{ $stats['edges'] }} связей.
+                Узлы: проекты, темы и карточки. Связи: проект → карточка, тема → карточка
+                и общие редкие слова. Показано {{ $stats['nodes'] }} узлов и {{ $stats['edges'] }} связей.
                 @if ($truncated > 0)
                     Ещё {{ $truncated }} записей не попало — отфильтруйте по проекту.
                 @endif
@@ -52,7 +52,8 @@
 
             <div class="nb-graph-legend">
                 <span><i style="background:#8b5cf6"></i> проект</span>
-                <span><i style="background:#22c55e"></i> запись</span>
+                <span><i style="background:#0ea5e9"></i> тема</span>
+                <span><i style="background:#22c55e"></i> карточка</span>
                 <span><i style="background:#eab308"></i> найдено по запросу</span>
                 <span>Клик — карточка, двойной клик — открыть, Esc — сброс</span>
             </div>

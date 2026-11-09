@@ -9,6 +9,7 @@
 
 const COLORS = {
   project: '#8b5cf6',
+  topic: '#0ea5e9',
   entry: '#22c55e',
   match: '#eab308',
   projectPalette: ['#8b5cf6', '#06b6d4', '#f97316', '#ec4899', '#6366f1', '#14b8a6', '#eab308'],
@@ -64,14 +65,18 @@ class ForceGraph {
   seed() {
     const count = Math.max(1, this.nodes.length);
     this.nodes.forEach((node, index) => {
+      const hub = node.type !== 'entry';
       const angle = (index / count) * Math.PI * 2 + (index % 7) * 0.19;
-      const radius = node.type === 'project' ? 40 : 90 + (index % 11) * 14;
+      const radius = hub ? 40 : 90 + (index % 11) * 14;
       node.x = Math.cos(angle) * radius;
       node.y = Math.sin(angle) * radius;
       node.vx = 0;
       node.vy = 0;
       node.degree = 0;
-      node.r = node.type === 'project' ? Math.max(9, Math.min(26, node.size * 0.55)) : Math.max(2.6, Math.min(14, node.size * 0.42));
+      // Hubs stay visibly bigger than cards, but cards must stay clickable.
+      node.r = hub
+        ? Math.max(11, Math.min(30, node.size * 0.7))
+        : Math.max(4.5, Math.min(13, node.size * 0.6));
     });
 
     this.edges.forEach((edge) => {
@@ -89,9 +94,9 @@ class ForceGraph {
   step() {
     const nodes = this.nodes;
     const alpha = this.alpha;
-    const repulsion = 2600;
-    const spring = 0.006;
-    const centerPull = 0.012;
+    const repulsion = 5200;
+    const spring = 0.004;
+    const centerPull = 0.004;
 
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -108,7 +113,10 @@ class ForceGraph {
         }
 
         const dist = Math.sqrt(dist2);
-        const force = (repulsion * alpha) / dist2;
+        // Nodes with a bigger radius claim more space: repulsion scales with
+        // their combined size, otherwise hubs swallow their neighbours.
+        const size = (a.r + b.r) * 0.9;
+        const force = (repulsion * alpha * size) / dist2;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
 
@@ -127,8 +135,13 @@ class ForceGraph {
       const dx = b.x + edge.ax - a.x;
       const dy = b.y + edge.ay - a.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const target = 46 + Math.min(60, 120 / Math.sqrt(edge.weight || 1));
-      const force = (dist - target) * spring * alpha * Math.min(3, edge.weight || 1);
+      // Project/topic edges need room for their labels, keyword links stay tight.
+      const hubEdge = a.type !== 'entry' || b.type !== 'entry';
+      const target = (hubEdge ? 120 : 70) + Math.min(80, 140 / Math.sqrt(edge.weight || 1));
+      // A project with a single card would otherwise drift away from the cluster
+      // on pure repulsion, so membership pulls noticeably harder.
+      const membership = a.type === 'project' || b.type === 'project' ? 2.6 : 1;
+      const force = (dist - target) * spring * membership * alpha * Math.min(3, edge.weight || 1);
 
       a.vx += (dx / dist) * force;
       a.vy += (dy / dist) * force;
@@ -137,15 +150,18 @@ class ForceGraph {
     }
 
     for (const node of nodes) {
-      node.vx -= node.x * centerPull;
-      node.vy -= node.y * centerPull;
-      node.vx *= 0.86;
-      node.vy *= 0.86;
+      // Hubs drift to the middle, single cards orbit — that reads as a map
+      // instead of a plain ball.
+      const pull = centerPull * (node.type === 'entry' ? 1 : 0.25);
+      node.vx -= node.x * pull;
+      node.vy -= node.y * pull;
+      node.vx *= 0.85;
+      node.vy *= 0.85;
       node.x += node.vx;
       node.y += node.vy;
     }
 
-    this.alpha = Math.max(0.02, this.alpha * 0.994);
+    this.alpha = Math.max(0.015, this.alpha * 0.993);
   }
 
   start() {
@@ -170,10 +186,28 @@ class ForceGraph {
     this.frame = requestAnimationFrame(loop);
   }
 
+  /**
+   * Physics with a deliberate cooling schedule: a plain decay stalls before the
+   * layout separates, which is what turns the graph into a blob.
+   */
   warmup(steps = 260) {
     for (let i = 0; i < steps; i++) {
+      this.alpha = Math.max(0.06, 0.95 - (i / steps) * 0.85);
       this.step();
     }
+
+    this.alpha = 0.05;
+  }
+
+  /**
+   * Layout that is already settled still sits wherever physics left it: fit it
+   * into the canvas so the graph opens readable instead of a corner cluster.
+   */
+  settle() {
+    this.warmup(420);
+    this.fit();
+    this.warmup(120);
+    this.fit();
   }
 
   /* ------------------------------------------------------------------ */
@@ -209,9 +243,12 @@ class ForceGraph {
   color(node) {
     if (this.matches.has(node.id)) return COLORS.match;
     if (node.type === 'project') return COLORS.project;
-    if (this.colorByProject && node.project) {
-      return this.projectColor(node.project);
+    if (node.type === 'topic') return COLORS.topic;
+
+    if (this.colorByProject) {
+      return node.project ? this.projectColor(node.project) : COLORS.entry;
     }
+
     return KIND_COLORS[node.kind] || COLORS.entry;
   }
 
@@ -238,6 +275,8 @@ class ForceGraph {
     const textColor = dark ? 'rgba(226,232,240,0.82)' : 'rgba(30,41,59,0.82)';
 
     ctx.lineWidth = 1;
+    const labels = [];
+
     for (const edge of this.edges) {
       const a = this.byId.get(edge.source);
       const b = this.byId.get(edge.target);
@@ -292,20 +331,64 @@ class ForceGraph {
       }
 
       const labelAlpha = emphasis ? 1 : 0.25;
-      const showLabel = this.labelsAlways && (isProject || node.r * this.scale > 3.2 || this.matches.has(node.id) || this.hovered === node.id || isSelected);
+      const isTopic = node.type === 'topic';
+      // Only hubs carry permanent labels: 48 card titles at once make the graph
+      // unreadable, so a card shows its title on hover, selection or a match.
+      const showLabel = isProject || isTopic || this.matches.has(node.id) || this.hovered === node.id || isSelected;
 
       if (showLabel) {
-        ctx.globalAlpha = labelAlpha;
-        ctx.font = isProject ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
-        ctx.fillStyle = isProject ? (dark ? '#e9d5ff' : '#5b21b6') : textColor;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        const label = node.label.length > 34 ? `${node.label.slice(0, 32)}…` : node.label;
-        ctx.fillText(label, point.x, point.y + radius + 4);
+        labels.push({
+          node,
+          point,
+          radius,
+          alpha: labelAlpha,
+          hub: isProject || isTopic,
+          project: isProject,
+          selected: isSelected,
+        });
       }
 
       ctx.globalAlpha = 1;
     }
+
+    // Labels last: a card drawn after a topic would otherwise cover its title.
+    for (const label of labels) {
+      const { node, point, radius, alpha, hub, project } = label;
+      const max = hub ? 26 : 30;
+      const text = node.label.length > max ? `${node.label.slice(0, max - 2)}…` : node.label;
+
+      ctx.globalAlpha = alpha;
+      ctx.font = hub ? '600 12px system-ui, sans-serif' : '11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      const below = point.y + radius + (hub ? 6 : 4);
+      const flip = below + 16 > this.height;
+      const y = flip ? point.y - radius - (hub ? 18 : 16) : below;
+      const width = ctx.measureText(text).width;
+
+      if (hub) {
+        // Hubs get a soft plate: their titles are the map legend.
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.fillStyle = dark ? 'rgba(11,16,32,0.75)' : 'rgba(255,255,255,0.8)';
+        ctx.fillRect(point.x - width / 2 - 4, y - 2, width + 8, 16);
+        ctx.globalAlpha = alpha;
+      } else if (! label.selected) {
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle = dark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.92)';
+        ctx.fillRect(point.x - width / 2 - 3, y - 2, width + 6, 15);
+        ctx.globalAlpha = alpha;
+      }
+
+      ctx.fillStyle = project
+        ? (dark ? '#e9d5ff' : '#5b21b6')
+        : hub
+          ? (dark ? '#bae6fd' : '#0369a1')
+          : textColor;
+      ctx.fillText(text, point.x, y);
+    }
+
+    ctx.globalAlpha = 1;
   }
 
   isNeighbour(id) {
@@ -398,16 +481,17 @@ class ForceGraph {
     let maxY = -Infinity;
 
     for (const node of this.nodes) {
-      minX = Math.min(minX, node.x);
-      minY = Math.min(minY, node.y);
-      maxX = Math.max(maxX, node.x);
-      maxY = Math.max(maxY, node.y);
+      // Include the circle radius: fitting centres only cuts the outer hubs.
+      minX = Math.min(minX, node.x - node.r);
+      minY = Math.min(minY, node.y - node.r);
+      maxX = Math.max(maxX, node.x + node.r);
+      maxY = Math.max(maxY, node.y + node.r);
     }
 
-    const padding = 60;
+    const padding = 48;
     const spanX = Math.max(1, maxX - minX + padding * 2);
     const spanY = Math.max(1, maxY - minY + padding * 2);
-    this.scale = Math.min(this.width / spanX, this.height / spanY, 2);
+    this.scale = Math.min(this.width / spanX, this.height / spanY, 1.5);
     this.offsetX = -((minX + maxX) / 2);
     this.offsetY = -((minY + maxY) / 2);
     this.draw();
@@ -610,7 +694,7 @@ function boot() {
   const detail = document.getElementById('nb-graph-detail');
   const selectedId = focus[0] || null;
 
-  graph.warmup();
+  graph.settle();
   graph.start();
 
   if (selectedId) {

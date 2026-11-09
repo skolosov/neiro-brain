@@ -98,8 +98,20 @@ final class BrainGraph
 
         $edges = [];
 
-        foreach ($this->projectNodes($entries, $url) as $id => $node) {
-            $nodes[$id] = $node;
+        // A single project would connect every card to one hub and the graph
+        // collapses into a star. The project layer appears only when there is
+        // something to compare, i.e. two or more projects.
+        $showProjects = $entries
+            ->pluck('project')
+            ->map(fn (?string $value): string => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->count() > 1;
+
+        if ($showProjects) {
+            foreach ($this->projectNodes($entries, $url) as $id => $node) {
+                $nodes[$id] = $node;
+            }
         }
 
         foreach ($this->topicNodes($entries, $url) as $id => $node) {
@@ -109,7 +121,7 @@ final class BrainGraph
         foreach ($entries as $entry) {
             $project = trim((string) $entry->project);
 
-            if ($project !== '' && isset($nodes['p'.$project])) {
+            if ($showProjects && $project !== '' && isset($nodes['p'.$project])) {
                 $edges['p'.$project.'|e'.$entry->id] = new GraphEdge('p'.$project, 'e'.$entry->id, 1);
             }
 
@@ -204,9 +216,11 @@ final class BrainGraph
         $nodes = [];
 
         foreach ($this->topics->group($entries) as $topic => $items) {
-            // On a small base every theme is worth showing; once the base grows,
-            // a theme used by a single card is just that card's tag.
-            if ($items->count() < ($entries->count() < 20 ? 1 : 2)) {
+            // A theme needs a few cards behind it: on a small base every theme is
+            // worth showing, on a real one a one-card theme is just that card's tag.
+            $threshold = $entries->count() < 12 ? 1 : 3;
+
+            if ($items->count() < $threshold) {
                 continue;
             }
 
