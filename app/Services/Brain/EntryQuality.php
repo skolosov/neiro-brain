@@ -103,6 +103,13 @@ final class EntryQuality
             return 'fragment';
         }
 
+        // A card must be written, not copied. The heuristic extractor turns a
+        // user sentence into a card by truncating that same sentence for the
+        // title, so a verbatim copy is the signature of transcript noise.
+        if ($this->isVerbatimRestatement($title, $content)) {
+            return 'restatement';
+        }
+
         if ($entry->importance < 3) {
             return 'low_importance';
         }
@@ -140,6 +147,37 @@ final class EntryQuality
         $text = mb_strtolower(preg_replace('/\s+/u', ' ', $entry->title.' '.$entry->content) ?? '');
 
         return hash('sha256', preg_replace('/[^\p{L}\p{N} ]+/u', '', $text) ?? $text);
+    }
+
+    /**
+     * True when the card repeats the source sentence instead of stating a fact.
+     *
+     * The heuristic fallback uses the sentence itself as content and its
+     * truncated head as the title, so a long title that prefixes the content
+     * means nothing was summarized. Doing this check here also protects the
+     * AI path: a model that echoes the transcript produces the same shape.
+     */
+    private function isVerbatimRestatement(string $title, string $content): bool
+    {
+        $title = $this->plain($title);
+        $content = $this->plain($content);
+
+        if ($title === '' || $content === '') {
+            return false;
+        }
+
+        if ($title === $content) {
+            return true;
+        }
+
+        return mb_strlen($title) >= 40 && str_starts_with($content, $title);
+    }
+
+    private function plain(string $text): string
+    {
+        $text = mb_strtolower(preg_replace('/\s+/u', ' ', $text) ?? $text);
+
+        return trim(preg_replace('/[^\p{L}\p{N} ]+/u', '', $text) ?? $text);
     }
 
     private function isQuestion(string $content): bool

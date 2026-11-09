@@ -60,14 +60,27 @@ final class ExtractionPipeline
             try {
                 $extracted = $this->extractWithAi($transcript, $provider, $conversation);
                 $entries = $this->quality->filter($extracted['entries'])['entries'];
+                $engine = 'ai:'.$this->aiSettings->provider.':'.$this->aiSettings->model;
 
-                if ($entries !== [] || $extracted['updates'] !== []) {
-                    return [
-                        'entries' => $entries,
-                        'updates' => $extracted['updates'],
-                        'engine' => 'ai:'.$this->aiSettings->provider.':'.$this->aiSettings->model,
-                    ];
+                // An empty answer is an answer: the prompt tells the model to
+                // return nothing rather than noise. Treating it as a failure
+                // used to hand the conversation to the heuristic extractor,
+                // which stores raw chat lines verbatim — that is where cards
+                // like "Сейчас я это все пишу что бы мы могли протестировать"
+                // came from. Only a real provider error falls back.
+                if ($entries === [] && $extracted['updates'] === []) {
+                    Log::info('Neiro Brain: AI extraction found no durable knowledge.', [
+                        'conversation_id' => $conversation->id,
+                    ]);
+
+                    return ['entries' => [], 'updates' => [], 'engine' => $engine.':empty'];
                 }
+
+                return [
+                    'entries' => $entries,
+                    'updates' => $extracted['updates'],
+                    'engine' => $engine,
+                ];
             } catch (Throwable $exception) {
                 Log::warning('Neiro Brain: AI extraction failed, falling back to heuristic extractor.', [
                     'conversation_id' => $conversation->id,

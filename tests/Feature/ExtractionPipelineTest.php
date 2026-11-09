@@ -57,6 +57,36 @@ class ExtractionPipelineTest extends TestCase
         $this->assertSame(4, $result['entries'][0]->importance);
     }
 
+    public function test_empty_ai_answer_does_not_fall_back_to_heuristic(): void
+    {
+        $ai = app(AiSettings::class);
+        $ai->enabled = true;
+        $ai->provider = 'openai';
+        $ai->model = 'gpt-test';
+        $ai->api_key = 'test-key';
+        $ai->heuristic_fallback = true;
+        $ai->save();
+
+        KnowledgeExtractionAgent::fake([
+            ['entries' => [], 'updates' => []],
+        ]);
+
+        $source = app(SourceRegistry::class)->proxy();
+        $conversation = app(ConversationIngestor::class)->ingest(
+            $source,
+            'empty-ai-test',
+            [
+                ['role' => 'user', 'content' => 'Сейчас я это всё пишу, чтобы проверить, работает ли база знаний.'],
+            ],
+        )['conversation'];
+
+        $result = app(ExtractionPipeline::class)->extract($conversation);
+
+        $this->assertSame('ai:openai:gpt-test:empty', $result['engine']);
+        $this->assertSame([], $result['entries']);
+        $this->assertSame([], $result['updates']);
+    }
+
     public function test_heuristic_fallback_is_used_without_api_key(): void
     {
         $ai = app(AiSettings::class);
