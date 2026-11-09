@@ -263,15 +263,95 @@
 </div>
 
 <script>
+/*
+ * Copy a token to the clipboard.
+ *
+ * navigator.clipboard only exists in a secure context (https or localhost) and
+ * rejects when the browser withholds permission; execCommand is kept for
+ * exactly those cases. A failure must say so — a button that silently does
+ * nothing is what makes this look broken. Clicking the token itself selects it,
+ * so Ctrl+C always works even when the clipboard API is unavailable.
+ */
 document.addEventListener('click', function (event) {
+    var token = event.target.closest('.nb-token-value code');
+
+    if (token) {
+        var range = document.createRange();
+
+        range.selectNodeContents(token);
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
     var button = event.target.closest('[data-copy]');
-    if (!button) return;
+
+    if (!button) {
+        return;
+    }
+
     var source = document.getElementById(button.dataset.copy);
-    if (!source) return;
-    navigator.clipboard.writeText(source.textContent.trim()).then(function () {
-        var label = button.textContent;
-        button.textContent = 'Скопировано';
-        setTimeout(function () { button.textContent = label; }, 1500);
+
+    if (!source) {
+        return;
+    }
+
+    var value = source.textContent.trim();
+
+    if (!value || value === 'не задан') {
+        report('Токен не задан — сгенерируйте новый.');
+        return;
+    }
+
+    copyText(value).then(function (ok) {
+        report(ok ? 'Скопировано' : 'Не удалось скопировать — выделите токен и нажмите Ctrl+C');
     });
+
+    function report(text) {
+        var original = button.dataset.label || button.textContent;
+
+        button.dataset.label = original;
+        button.textContent = text;
+
+        if (text.indexOf('Не удалось') !== 0 && text.indexOf('не задан') === -1) {
+            setTimeout(function () { button.textContent = original; }, 1500);
+        }
+    }
+
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text).then(function () {
+                return true;
+            }).catch(function () {
+                return legacyCopy(text);
+            });
+        }
+
+        return Promise.resolve(legacyCopy(text));
+    }
+
+    function legacyCopy(text) {
+        var area = document.createElement('textarea');
+
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.top = '-1000px';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+
+        var ok = false;
+
+        try {
+            ok = document.execCommand('copy');
+        } catch (error) {
+            ok = false;
+        }
+
+        document.body.removeChild(area);
+
+        return ok;
+    }
 });
 </script>
