@@ -257,6 +257,22 @@ class KnowledgeCardsTest extends TestCase
             ->assertSee('Интеграции');
     }
 
+    public function test_pages_render_on_an_empty_base(): void
+    {
+        $admin = $this->admin();
+
+        foreach (['search-page', 'graph-page', 'projects-page'] as $pageUri) {
+            $this->actingAs($admin, 'moonshine')
+                ->get(route('moonshine.page', ['pageUri' => $pageUri]))
+                ->assertOk();
+        }
+
+        $this->actingAs($admin, 'moonshine')
+            ->get(route('moonshine.index'))
+            ->assertOk()
+            ->assertSee('Что лежит в базе');
+    }
+
     public function test_card_panel_includes_atoms_and_keywords(): void
     {
         $entry = $this->write(
