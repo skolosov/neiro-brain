@@ -69,6 +69,7 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeOpenAi($payload);
+        $payload['messages'] = $this->sanitizeOpenAiMessages($payload['messages']);
 
         $headers = [
             'X-Neiro-Memory-Hits' => (string) count($hits),
@@ -806,6 +807,30 @@ class ProxyController extends Controller
             $providerKey,
             $protocol,
         );
+    }
+
+    /**
+     * Strict OpenAI-compatible gateways reject a null message content, and the
+     * harness sends null for assistant turns that carry no text (tool calls
+     * only) or for an empty tool result. Normalizing it to an empty string
+     * keeps the proxy transparent for the client without changing semantics.
+     *
+     * @param  array<int, mixed>  $messages
+     * @return array<int, mixed>
+     */
+    private function sanitizeOpenAiMessages(array $messages): array
+    {
+        foreach ($messages as $index => $message) {
+            if (! is_array($message)) {
+                continue;
+            }
+
+            if (array_key_exists('content', $message) && $message['content'] === null) {
+                $messages[$index]['content'] = '';
+            }
+        }
+
+        return $messages;
     }
 
     /**

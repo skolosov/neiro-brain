@@ -381,4 +381,51 @@ class ProxyTest extends TestCase
         $this->assertSame('0', $response->headers->get('X-Neiro-Memory-Hits'));
         $this->assertStringNotContainsString('Основной стек', $response->json('choices.0.message.content'));
     }
+
+    public function test_null_message_content_is_normalized_before_upstream(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'deepseek-flash',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+            ]),
+        ]);
+
+        $response = $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+        ])->postJson('/v1/chat/completions', [
+            'model' => 'deepseek-flash',
+            'messages' => [
+                ['role' => 'user', 'content' => 'test'],
+                ['role' => 'assistant', 'content' => null, 'tool_calls' => [[
+                    'id' => 'call_1',
+                    'type' => 'function',
+                    'function' => ['name' => 'bash', 'arguments' => '{}'],
+                ]]],
+                ['role' => 'tool', 'tool_call_id' => 'call_1', 'content' => null],
+                ['role' => 'user', 'content' => 'done'],
+            ],
+        ]);
+
+        $response->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            foreach ($request->data()['messages'] ?? [] as $message) {
+                if (! is_string($message['content'] ?? null)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
 }
