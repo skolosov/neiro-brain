@@ -53,40 +53,22 @@ class BrainAdminController extends Controller
         ));
     }
 
-    public function generateToken(Request $request): RedirectResponse
+    public function generateToken(): RedirectResponse
     {
         app(SettingsInitializer::class)->ensure();
 
-        $target = (string) $request->input('action_generate_token', '');
         $token = 'nb-'.Str::random(40);
 
-        switch ($target) {
-            case 'proxy':
-                $settings = app(ProxySettings::class);
-                $settings->access_token = $token;
-                $settings->save();
+        $proxy = app(ProxySettings::class);
+        $proxy->access_token = $token;
+        $proxy->save();
 
-                break;
+        $security = app(SecuritySettings::class);
+        $security->mcp_token = $token;
+        $security->api_token = $token;
+        $security->save();
 
-            case 'mcp':
-                $settings = app(SecuritySettings::class);
-                $settings->mcp_token = $token;
-                $settings->save();
-
-                break;
-
-            case 'api':
-                $settings = app(SecuritySettings::class);
-                $settings->api_token = $token;
-                $settings->save();
-
-                break;
-
-            default:
-                return back()->withErrors(['action_generate_token' => 'Неизвестный тип токена.']);
-        }
-
-        return back()->with('brain_generated', strtoupper($target));
+        return back()->with('brain_generated', 'access');
     }
 
     public function updateSettings(Request $request): RedirectResponse
@@ -109,7 +91,7 @@ class BrainAdminController extends Controller
             'retrieval_freshness_weight' => ['required', 'numeric', 'min:0', 'max:1'],
             'retrieval_importance_weight' => ['required', 'numeric', 'min:0', 'max:0.5'],
             'proxy_enabled' => ['nullable', 'boolean'],
-            'proxy_access_token' => ['nullable', 'string', 'max:255'],
+            'access_token' => ['nullable', 'string', 'max:255'],
             'proxy_inject_memory' => ['nullable', 'boolean'],
             'proxy_capture' => ['nullable', 'boolean'],
             'proxy_top_k' => ['required', 'integer', 'min:1', 'max:20'],
@@ -121,8 +103,6 @@ class BrainAdminController extends Controller
             'sync_transcript_retention_hours' => ['required', 'integer', 'min:0', 'max:8760'],
             'security_mask_secrets' => ['nullable', 'boolean'],
             'security_mask_emails' => ['nullable', 'boolean'],
-            'security_mcp_token' => ['nullable', 'string', 'max:255'],
-            'security_api_token' => ['nullable', 'string', 'max:255'],
         ]);
 
         $ai = app(AiSettings::class);
@@ -156,8 +136,10 @@ class BrainAdminController extends Controller
         $proxy->top_k = (int) $validated['proxy_top_k'];
         $proxy->max_context_chars = (int) $validated['proxy_max_context_chars'];
 
-        if (($validated['proxy_access_token'] ?? '') !== '') {
-            $proxy->access_token = $validated['proxy_access_token'];
+        $newToken = (string) ($validated['access_token'] ?? '');
+
+        if ($newToken !== '') {
+            $proxy->access_token = $newToken;
         }
 
         $proxy->save();
@@ -174,12 +156,9 @@ class BrainAdminController extends Controller
         $security->mask_secrets = $request->boolean('security_mask_secrets');
         $security->mask_emails = $request->boolean('security_mask_emails');
 
-        if (($validated['security_mcp_token'] ?? '') !== '') {
-            $security->mcp_token = $validated['security_mcp_token'];
-        }
-
-        if (($validated['security_api_token'] ?? '') !== '') {
-            $security->api_token = $validated['security_api_token'];
+        if ($newToken !== '') {
+            $security->mcp_token = $newToken;
+            $security->api_token = $newToken;
         }
 
         $security->save();

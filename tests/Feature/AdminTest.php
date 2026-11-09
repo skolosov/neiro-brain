@@ -10,6 +10,7 @@ use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Services\Brain\SourceRegistry;
 use App\Settings\ProxySettings;
+use App\Settings\SecuritySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
 use Tests\TestCase;
@@ -81,29 +82,32 @@ class AdminTest extends TestCase
             ->get(route('moonshine.page', ['pageUri' => 'settings-page']))
             ->assertOk()
             ->assertSee('Настройки Neiro Brain')
-            ->assertSee('Токены доступа')
+            ->assertSee('Токен доступа')
             ->assertSee('Поиск')
             ->assertSee('Суммаризация')
             ->assertSee('Насыщение повторов')
             ->assertDontSee('Upstream');
     }
 
-    public function test_admin_can_generate_a_new_proxy_token(): void
+    public function test_admin_generates_one_token_for_all_scopes(): void
     {
         $this->actingAs($this->admin(), 'moonshine')
-            ->post(route('brain.admin.tokens.generate'), ['action_generate_token' => 'proxy'])
+            ->post(route('brain.admin.tokens.generate'))
             ->assertRedirect();
 
         $token = app(ProxySettings::class)->refresh()->access_token;
+        $security = app(SecuritySettings::class)->refresh();
 
         $this->assertNotSame('dev-proxy-token', $token);
         $this->assertStringStartsWith('nb-', $token);
+        $this->assertSame($token, $security->mcp_token);
+        $this->assertSame($token, $security->api_token);
     }
 
-    public function test_generated_token_authorizes_the_proxy(): void
+    public function test_generated_token_authorizes_proxy_mcp_and_api(): void
     {
         $this->actingAs($this->admin(), 'moonshine')
-            ->post(route('brain.admin.tokens.generate'), ['action_generate_token' => 'proxy']);
+            ->post(route('brain.admin.tokens.generate'));
 
         $token = app(ProxySettings::class)->refresh()->access_token;
 
@@ -112,6 +116,10 @@ class AdminTest extends TestCase
                 'model' => 'test',
                 'messages' => [['role' => 'user', 'content' => 'ping']],
             ])
+            ->assertOk();
+
+        $this->withHeaders(['Authorization' => 'Bearer '.$token])
+            ->getJson('/api/v1/stats')
             ->assertOk();
 
         $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-proxy-token'])

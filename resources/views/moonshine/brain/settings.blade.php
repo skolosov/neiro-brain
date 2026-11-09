@@ -2,6 +2,9 @@
 
 @php
     $reveal = fn (?string $token): string => $token !== null && $token !== '' ? $token : 'не задан';
+    $unifiedToken = count(array_unique([$proxy->access_token, $security->mcp_token, $security->api_token])) === 1
+        ? $proxy->access_token
+        : null;
 @endphp
 
 <div class="nb-page">
@@ -10,7 +13,7 @@
     @endif
     @if (session('brain_generated'))
         <div class="nb-flash">
-            Новый {{ session('brain_generated') }}-токен создан. Скопируйте его и обновите в харнессе —
+            Новый токен создан. Он действует для прокси, MCP и API — скопируйте его и обновите в харнессе,
             старое значение больше не действует.
         </div>
     @endif
@@ -38,66 +41,43 @@
         @csrf
 
         <section class="nb-section">
-            <h2>Токены доступа</h2>
+            <h2>Токен доступа</h2>
             <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
-                Три независимых токена. Сгенерируйте свои, скопируйте в харнесс — здесь они больше не показываются полностью.
+                Один токен на всё: <code>X-Neiro-Proxy-Token</code> для <code>/v1/*</code> и
+                <code>Authorization: Bearer</code> для <code>/mcp/knowledge</code> и <code>/api/v1/*</code>.
+                Сгенерируйте свой и скопируйте в харнесс — здесь он больше не показывается полностью.
             </p>
 
             <div class="nb-token">
                 <div class="nb-token-head">
                     <div>
-                        <div class="nb-label" style="margin:0">Прокси-токен</div>
-                        <div class="nb-help" style="margin:0">Заголовок <code>X-Neiro-Proxy-Token</code> для <code>/v1/*</code></div>
+                        <div class="nb-label" style="margin:0">Токен</div>
+                        <div class="nb-help" style="margin:0">
+                            @if ($unifiedToken !== null)
+                                Действует во всех трёх каналах.
+                            @else
+                                Каналы пока используют разные токены — нажмите «Сгенерировать новый», чтобы остался один.
+                            @endif
+                        </div>
                     </div>
-                    <div class="nb-token-value"><code id="nb-proxy-token">{{ $reveal($proxy->access_token) }}</code></div>
+                    <div class="nb-token-value"><code id="nb-token">{{ $reveal($unifiedToken ?? $proxy->access_token) }}</code></div>
                 </div>
                 <div class="nb-token-actions">
-                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-proxy-token">Скопировать</button>
+                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-token">Скопировать</button>
                     <button type="submit" class="nb-btn nb-btn-secondary"
                             formaction="{{ route('brain.admin.tokens.generate') }}"
-                            name="action_generate_token" value="proxy"
-                            onclick="return confirm('Сгенерировать новый прокси-токен? Харнесс перестанет работать, пока не обновите токен в нём.')">
+                            name="action_generate_token" value="all"
+                            onclick="return confirm('Сгенерировать новый токен? Он заменит все три сразу, и клиенты перестанут работать, пока вы не обновите токен в них.')">
                         Сгенерировать новый
                     </button>
                 </div>
             </div>
 
-            <div class="nb-token">
-                <div class="nb-token-head">
-                    <div>
-                        <div class="nb-label" style="margin:0">MCP-токен</div>
-                        <div class="nb-help" style="margin:0">Заголовок <code>Authorization: Bearer</code> для <code>/mcp/knowledge</code></div>
-                    </div>
-                    <div class="nb-token-value"><code id="nb-mcp-token">{{ $reveal($security->mcp_token) }}</code></div>
-                </div>
-                <div class="nb-token-actions">
-                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-mcp-token">Скопировать</button>
-                    <button type="submit" class="nb-btn nb-btn-secondary"
-                            formaction="{{ route('brain.admin.tokens.generate') }}"
-                            name="action_generate_token" value="mcp"
-                            onclick="return confirm('Сгенерировать новый MCP-токен? MCP-сервер в харнессе нужно будет обновить.')">
-                        Сгенерировать новый
-                    </button>
-                </div>
-            </div>
-
-            <div class="nb-token">
-                <div class="nb-token-head">
-                    <div>
-                        <div class="nb-label" style="margin:0">API-токен</div>
-                        <div class="nb-help" style="margin:0">Заголовок <code>Authorization: Bearer</code> для <code>/api/v1/*</code></div>
-                    </div>
-                    <div class="nb-token-value"><code id="nb-api-token">{{ $reveal($security->api_token) }}</code></div>
-                </div>
-                <div class="nb-token-actions">
-                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-api-token">Скопировать</button>
-                    <button type="submit" class="nb-btn nb-btn-secondary"
-                            formaction="{{ route('brain.admin.tokens.generate') }}"
-                            name="action_generate_token" value="api"
-                            onclick="return confirm('Сгенерировать новый API-токен? Внешние интеграции нужно будет обновить.')">
-                        Сгенерировать новый
-                    </button>
-                </div>
+            <div style="margin-top:1rem">
+                <label class="nb-label" for="access_token">Заменить своим значением</label>
+                <input type="text" name="access_token" id="access_token" value="{{ old('access_token') }}" class="nb-input"
+                       placeholder="оставьте пустым, чтобы не менять">
+                <p class="nb-help">Значение попадёт во все три канала сразу.</p>
             </div>
         </section>
 
