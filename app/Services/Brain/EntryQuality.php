@@ -166,11 +166,29 @@ final class EntryQuality
             return false;
         }
 
+        // Written in third person: the sentence was restated, not copied, so a
+        // title that opens the paragraph is a theme label and not the truncated
+        // head of the user's own line.
+        if ($this->opensInThirdPerson($content)) {
+            return false;
+        }
+
         if ($title === $content) {
             return true;
         }
 
         return mb_strlen($title) >= 40 && str_starts_with($content, $title);
+    }
+
+    /**
+     * A card about the user is written about him, not quoted from him.
+     */
+    private function opensInThirdPerson(string $content): bool
+    {
+        return preg_match(
+            '/^(пользователь|пользователю|команда|компания|в проекте|в компании|проект|его|их)\b/u',
+            $content,
+        ) === 1;
     }
 
     private function plain(string $text): string

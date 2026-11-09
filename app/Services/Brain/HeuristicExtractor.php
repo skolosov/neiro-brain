@@ -78,19 +78,75 @@ final class HeuristicExtractor
 
         foreach ($candidates as $candidate) {
             $sentence = $candidate['sentence'];
+            $kind = $this->classify($sentence);
+
+            // A card states a fact, it does not echo the user. Writing the
+            // sentence in third person is what separates a card from a copied
+            // line — and the quality gate rejects copied lines on purpose.
+            $content = $this->toThirdPerson($sentence);
+            $title = $this->title($content);
+
+            if ($title === '' || $title === rtrim($content, ' .!?…')) {
+                continue;
+            }
+
             $entries[] = new ExtractedEntry(
-                kind: $this->classify($sentence),
-                title: $this->title($sentence),
-                content: $sentence,
+                kind: $kind,
+                title: $title,
+                content: $content,
                 details: null,
                 project: $conversation->project,
                 tags: $this->tags($sentence),
-                importance: $this->importance($this->classify($sentence)),
+                importance: $this->importance($kind),
                 confidence: 0.55,
             );
         }
 
         return $entries;
+    }
+
+    /**
+     * Rewrite a first-person sentence as a statement about the user.
+     *
+     * Only the opening is transformed: the rest of the sentence keeps the
+     * user's own words, so nothing is invented.
+     */
+    private function toThirdPerson(string $sentence): string
+    {
+        $map = [
+            'я не люблю' => 'Пользователь не любит',
+            'я не использую' => 'Пользователь не использует',
+            'я предпочитаю' => 'Пользователь предпочитает',
+            'я использую' => 'Пользователь использует',
+            'я выбираю' => 'Пользователь выбирает',
+            'я планирую' => 'Пользователь планирует',
+            'я работаю' => 'Пользователь работает',
+            'я пишу' => 'Пользователь пишет',
+            'я хочу' => 'Пользователь хочет',
+            'я люблю' => 'Пользователь любит',
+            'мне не нравится' => 'Пользователю не нравится',
+            'мне нравится' => 'Пользователю нравится',
+            'мы не используем' => 'Команда не использует',
+            'мы используем' => 'Команда использует',
+            'мы решили' => 'Команда решила',
+            'мы выбрали' => 'Команда выбрала',
+            'мы отказались' => 'Команда отказалась',
+            'мой ' => 'Его ',
+            'моя ' => 'Его ',
+            'мои ' => 'Его ',
+            'наш ' => 'Их ',
+            'наша ' => 'Их ',
+        ];
+
+        $lower = mb_strtolower($sentence);
+
+        foreach ($map as $from => $to) {
+            if (str_starts_with($lower, $from)) {
+                return $to.mb_substr($sentence, mb_strlen($from));
+            }
+        }
+
+        return $sentence;
     }
 
     /**
@@ -267,20 +323,16 @@ final class HeuristicExtractor
     {
         $clean = trim(preg_replace('/^[\s\-–—*•\d.)"«]+/u', '', $sentence) ?? $sentence);
 
-        // A title is a phrase, not half a sentence: cut at punctuation or dash
-        // instead of truncating mid-word.
+        // A title is a theme, not half a sentence: cut at punctuation or dash
+        // instead of truncating mid-word, and keep it short enough to scan.
         $parts = preg_split('/[,:;—–]| - /u', $clean) ?: [$clean];
         $title = rtrim(trim($parts[0]), ' .!?…');
 
-        if (mb_strlen($title) < 12) {
-            $head = mb_substr($clean, 0, 70);
+        if (mb_strlen($title) > 46) {
+            $head = mb_substr($title, 0, 46);
             $space = mb_strrpos($head, ' ');
-            $title = rtrim($space !== false ? mb_substr($head, 0, $space) : $head, ' .!?…');
+            $title = rtrim($space !== false ? mb_substr($head, 0, $space) : $head, ' .!?…,:;—–-');
         }
-
-        $title = mb_strlen($title) > 80
-            ? rtrim(mb_substr($title, 0, (int) mb_strrpos(mb_substr($title, 0, 80), ' ')), ' .!?…')
-            : $title;
 
         return mb_strtoupper(mb_substr($title, 0, 1)).mb_substr($title, 1);
     }
