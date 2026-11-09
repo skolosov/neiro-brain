@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages;
 
-use App\Models\Conversation;
-use App\Models\KnowledgeChunk;
-use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeSource;
-use App\Models\SearchLog;
-use App\Models\SyncRun;
+use App\Services\Brain\BrainOverview;
+use App\Services\Brain\CardSearch;
 use Illuminate\Contracts\Support\Renderable;
 use MoonShine\Laravel\Pages\Page;
+use MoonShine\MenuManager\Attributes\Order;
+use MoonShine\Support\Attributes\Icon;
 use MoonShine\UI\Components\FlexibleRender;
 
+/**
+ * Overview: what is in the base right now, how it grows, and the health of the
+ * import pipeline. Cards, not tables, because the unit of this brain is a card.
+ */
+#[Icon('chart-bar')]
+#[Order(1)]
 class Dashboard extends Page
 {
     public function getTitle(): string
@@ -34,37 +38,21 @@ class Dashboard extends Page
      */
     protected function components(): iterable
     {
-        $projects = KnowledgeEntry::query()
-            ->approved()
-            ->whereNotNull('project')
-            ->where('project', '!=', '')
-            ->groupBy('project')
-            ->selectRaw('project, COUNT(*) as entries')
-            ->orderByDesc('entries')
-            ->limit(10)
-            ->get();
+        $overview = app(BrainOverview::class)->build();
+        $cardSearch = app(CardSearch::class);
 
-        $data = [
-            'entries' => KnowledgeEntry::query()->count(),
-            'approved' => KnowledgeEntry::query()->approved()->count(),
-            'drafts' => KnowledgeEntry::query()->where('status', 'draft')->count(),
-            'conversations' => Conversation::query()->count(),
-            'pending' => Conversation::query()->where('status', 'pending')->count(),
-            'chunks' => KnowledgeChunk::query()->count(),
-            'sources' => KnowledgeSource::query()->count(),
-            'searches24h' => SearchLog::query()->where('created_at', '>=', now()->subDay())->count(),
-            'lastRun' => SyncRun::query()->latest('id')->first(),
-            'recent' => KnowledgeEntry::query()->latest('updated_at')->limit(8)->get(),
-            'projects' => $projects,
-            'pendingConversations' => Conversation::query()
-                ->where('status', 'pending')
-                ->orderBy('last_activity_at')
-                ->limit(5)
-                ->get(),
-        ];
+        $overview['recentCards'] = $overview['recent']
+            ->map(fn ($entry): array => $cardSearch->cardFor($entry))
+            ->all();
+
+        $overview['seriesMax'] = max(1, max(array_column($overview['series'], 'value')));
+        $overview['topicsMax'] = max(1, $overview['topics']->max() ?? 1);
+        $overview['searchUrl'] = route('moonshine.page', ['pageUri' => 'search-page']);
+        $overview['graphUrl'] = route('moonshine.page', ['pageUri' => 'graph-page']);
+        $overview['projectsUrl'] = route('moonshine.page', ['pageUri' => 'projects-page']);
 
         return [
-            FlexibleRender::make(fn (): string => view('moonshine.brain.dashboard', $data)->render()),
+            FlexibleRender::make(fn (): string => view('moonshine.brain.dashboard', $overview)->render()),
         ];
     }
 }

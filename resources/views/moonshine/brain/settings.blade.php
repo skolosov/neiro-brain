@@ -219,6 +219,10 @@
                         Cron включён
                     </label>
                 </div>
+                <div>
+                    <label class="nb-label">Хранить переписку, часов</label>
+                    <input type="number" name="sync_transcript_retention_hours" value="{{ old('sync_transcript_retention_hours', $sync->transcript_retention_hours) }}" min="0" max="8760" class="nb-input">
+                </div>
             </div>
             <div class="nb-checks">
                 <label class="nb-check">
@@ -227,7 +231,12 @@
                     Автоматически подтверждать извлечённые знания
                 </label>
             </div>
-            <p class="nb-help">Синхронизация раз в 15 минут через OpenServer-задачу <code>Laravel Schedule</code>.</p>
+            <p class="nb-help">
+                Синхронизация раз в 15 минут через OpenServer-задачу <code>Laravel Schedule</code>.
+                Переписка — только сырьё для суммаризации: после того как из неё сделаны карточки,
+                сообщения удаляются (по умолчанию через 24 часа; <code>0</code> — не удалять).
+                Сами диалоги остаются у провайдера, у нас — только карточки знаний и счётчики.
+            </p>
         </section>
 
         <section class="nb-section">

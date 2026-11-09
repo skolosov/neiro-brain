@@ -12,6 +12,7 @@ use App\Models\KnowledgeSource;
 use App\Models\SearchLog;
 use App\Models\SyncRun;
 use App\Services\Brain\Indexer;
+use App\Services\Brain\TranscriptRetention;
 use App\Services\Connectors\ChatGptConnector;
 use App\Services\Connectors\Connector;
 use App\Services\Connectors\JsonlConnector;
@@ -52,6 +53,7 @@ final class SyncService
             'entries_updated' => 0,
             'reindexed' => 0,
             'pruned_logs' => 0,
+            'pruned_messages' => 0,
         ];
 
         try {
@@ -66,6 +68,7 @@ final class SyncService
 
                 $this->reindexStale($stats);
                 $this->pruneLogs($stats);
+                $stats['pruned_messages'] = app(TranscriptRetention::class)->prune();
             }
 
             $run->forceFill([

@@ -23,6 +23,12 @@ class SyncSettings extends Settings
 
     public int $search_log_retention_days = 90;
 
+    /**
+     * Raw messages are working material only: they exist to be summarized into
+     * cards and can be deleted once the cards are written. 0 disables cleanup.
+     */
+    public int $transcript_retention_hours = 24;
+
     public int $max_transcript_chars = 24000;
 
     public static function group(): string

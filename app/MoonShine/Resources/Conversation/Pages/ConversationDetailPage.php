@@ -12,6 +12,10 @@ use MoonShine\UI\Fields\Text;
 use MoonShine\UI\Fields\Textarea;
 
 /**
+ * A conversation is working material for summarization, not an archive: the
+ * page keeps the technical facts and the transcript only while it exists.
+ * The cards that came out of the dialogue are on the "Поиск" page.
+ *
  * @extends DetailPage<ConversationResource>
  */
 class ConversationDetailPage extends DetailPage
@@ -25,7 +29,6 @@ class ConversationDetailPage extends DetailPage
             Text::make('Проект', 'project'),
             Text::make('Статус', 'status'),
             Text::make('Сообщений', 'messages_count'),
-            Text::make('Токенов', 'tokens_count'),
             Date::make('Начало', 'started_at'),
             Date::make('Активность', 'last_activity_at'),
             Text::make('Ошибка', 'summary_error'),

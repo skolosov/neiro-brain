@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\MoonShine\Pages\GraphPage;
+use App\MoonShine\Pages\ProjectsPage;
+use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
 use App\MoonShine\Resources\Conversation\ConversationResource;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
@@ -33,6 +36,9 @@ class MoonShineServiceProvider extends ServiceProvider
             ])
             ->pages([
                 ...$core->getConfig()->getPages(),
+                SearchPage::class,
+                GraphPage::class,
+                ProjectsPage::class,
                 SettingsPage::class,
             ]);
     }

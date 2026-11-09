@@ -118,6 +118,7 @@ class BrainAdminController extends Controller
             'sync_quiet_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
             'sync_batch_size' => ['required', 'integer', 'min:1', 'max:200'],
             'sync_auto_approve' => ['nullable', 'boolean'],
+            'sync_transcript_retention_hours' => ['required', 'integer', 'min:0', 'max:8760'],
             'security_mask_secrets' => ['nullable', 'boolean'],
             'security_mask_emails' => ['nullable', 'boolean'],
             'security_mcp_token' => ['nullable', 'string', 'max:255'],
@@ -166,6 +167,7 @@ class BrainAdminController extends Controller
         $sync->quiet_minutes = (int) $validated['sync_quiet_minutes'];
         $sync->batch_size = (int) $validated['sync_batch_size'];
         $sync->auto_approve = $request->boolean('sync_auto_approve');
+        $sync->transcript_retention_hours = (int) $validated['sync_transcript_retention_hours'];
         $sync->save();
 
         $security = app(SecuritySettings::class);

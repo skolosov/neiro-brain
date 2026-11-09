@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Layouts;
 
+use App\MoonShine\Pages\GraphPage;
+use App\MoonShine\Pages\ProjectsPage;
+use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
 use App\MoonShine\Resources\Conversation\ConversationResource;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
@@ -36,6 +39,9 @@ final class MoonShineLayout extends AppLayout
         return [
             ...parent::menu(),
             MenuGroup::make('База знаний', [
+                MenuItem::make(SearchPage::class, 'Поиск', 'magnifying-glass'),
+                MenuItem::make(GraphPage::class, 'Граф', 'share'),
+                MenuItem::make(ProjectsPage::class, 'Проекты', 'folder'),
                 MenuItem::make(KnowledgeEntryResource::class, 'Знания', 'book-open'),
                 MenuItem::make(ConversationResource::class, 'Диалоги', 'chat-bubble-left-right'),
                 MenuItem::make(KnowledgeSourceResource::class, 'Источники', 'circle-stack'),

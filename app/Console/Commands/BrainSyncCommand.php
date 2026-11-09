@@ -42,6 +42,7 @@ class BrainSyncCommand extends Command
                 ['Entries updated', $stats['entries_updated']],
                 ['Reindexed', $stats['reindexed']],
                 ['Pruned search logs', $stats['pruned_logs']],
+                ['Pruned messages', $stats['pruned_messages'] ?? 0],
             ],
         );
 
