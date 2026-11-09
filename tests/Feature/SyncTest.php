@@ -69,6 +69,34 @@ class SyncTest extends TestCase
         File::deleteDirectory($directory);
     }
 
+    public function test_idle_sync_makes_no_ai_calls(): void
+    {
+        // A conversation that was already summarized: the cron keeps running
+        // every 15 minutes, but there is nothing new to learn.
+        Conversation::query()->create([
+            'external_id' => 'idle-1',
+            'source_id' => KnowledgeSource::query()->create([
+                'name' => 'Idle',
+                'slug' => 'idle',
+                'type' => 'proxy',
+                'enabled' => true,
+            ])->id,
+            'status' => 'summarized',
+            'messages_count' => 0,
+            'summarized_at' => now()->subDay(),
+            'last_activity_at' => now()->subDay(),
+        ]);
+
+        $before = \DB::table('knowledge_entries')->count();
+
+        $stats = app(SyncService::class)->run('idle', force: false);
+
+        // Silence means zero summarization, hence zero model calls and zero
+        // new cards: the base must not grow while the user says nothing.
+        $this->assertSame(0, $stats['summarized']);
+        $this->assertSame($before, \DB::table('knowledge_entries')->count());
+    }
+
     public function test_connector_does_not_duplicate_messages_on_second_run(): void
     {
         $directory = storage_path('framework/testing/brain-jsonl-repeat');

@@ -9,6 +9,7 @@ use App\Mcp\Resources\KnowledgeEntryResource;
 use App\Mcp\Resources\KnowledgeIndexResource;
 use App\Mcp\Tools\GetKnowledgeTool;
 use App\Mcp\Tools\ListProjectsTool;
+use App\Mcp\Tools\ProjectContextTool;
 use App\Mcp\Tools\RecentKnowledgeTool;
 use App\Mcp\Tools\RememberKnowledgeTool;
 use App\Mcp\Tools\SearchKnowledgeTool;
@@ -28,6 +29,7 @@ class KnowledgeServer extends Server
      * @var array<int, class-string<Tool>>
      */
     protected array $tools = [
+        ProjectContextTool::class,
         SearchKnowledgeTool::class,
         GetKnowledgeTool::class,
         RememberKnowledgeTool::class,

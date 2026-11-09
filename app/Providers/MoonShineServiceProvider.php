@@ -8,7 +8,6 @@ use App\MoonShine\Pages\GraphPage;
 use App\MoonShine\Pages\ProjectsPage;
 use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
-use App\MoonShine\Resources\Conversation\ConversationResource;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
 use App\MoonShine\Resources\KnowledgeSource\KnowledgeSourceResource;
 use App\MoonShine\Resources\MoonShineUser\MoonShineUserResource;
@@ -28,7 +27,6 @@ class MoonShineServiceProvider extends ServiceProvider
         $core
             ->resources([
                 KnowledgeEntryResource::class,
-                ConversationResource::class,
                 KnowledgeSourceResource::class,
                 SearchLogResource::class,
                 MoonShineUserResource::class,

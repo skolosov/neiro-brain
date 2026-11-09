@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /**
- * One knowledge card: title, source metadata, the facts it states and the
- * links back to projects, related cards and the graph.
+ * One knowledge card: title, one line of metadata, the summary and the full
+ * text. No "facts" breakdown — the card is written as prose and read as prose.
  *
  * @var array<string, mixed> $card
  * @var string $mode  'row' (compact list) or 'grid' (dashboard)
@@ -12,8 +12,13 @@ declare(strict_types=1);
 $mode = $mode ?? 'row';
 $kind = $card['kind'];
 $kindClass = 'nb-k-'.preg_replace('/[^a-z]/', '', is_string($kind) ? strtolower($kind) : 'other');
-$atoms = array_slice($card['atoms'] ?? [], 0, $mode === 'grid' ? 4 : 8);
 $pill = $kindClass.'-pill';
+
+// In the list a card is a line in the table of contents: title, one paragraph,
+// a few links. The full text lives in the right-hand panel, so showing it twice
+// would only make the page longer.
+$text = $card['summary'] ?? '';
+$isActive = ($activeId ?? 0) === $card['id'];
 ?>
 <article class="nb-card-w nb-knowledge-card {{ $kindClass }}" id="entry-{{ $card['id'] }}">
     <header class="nb-card-w-head">
@@ -24,31 +29,21 @@ $pill = $kindClass.'-pill';
             @endif
         </h3>
         <div class="nb-card-w-meta">
-            <span class="nb-pill {{ $pill }}">{{ $card['kind_label'] }}</span>
+            @if ($card['theme'])
+                <span class="nb-pill {{ $pill }}">{{ $card['theme'] }}</span>
+            @else
+                <span class="nb-pill {{ $pill }}">{{ $card['kind_label'] }}</span>
+            @endif
             @if ($card['project'])
                 <span class="nb-card-w-project">{{ $card['project'] }}</span>
+            @elseif (! empty($card['scope_label']) && ($card['scope'] ?? null) !== 'project')
+                <span class="nb-card-w-project">{{ $card['scope_label'] }}</span>
             @endif
             <span class="nb-card-w-date">{{ $card['occurred_at_label'] ?? $card['updated_at'] }}</span>
         </div>
     </header>
 
-    <div class="nb-card-w-summary">{!! $card['snippet_html'] !!}</div>
-
-    @if ($atoms !== [])
-        <div class="nb-atoms">
-            @foreach ($atoms as $atom)
-                <div class="nb-atom">
-                    <span class="nb-atom-type">{{ $atom['type'] }}</span>
-                    <span class="nb-atom-text">{{ $atom['text'] }}</span>
-                </div>
-            @endforeach
-        </div>
-        @if (($card['atoms_total'] ?? 0) > count($atoms))
-            <div class="nb-atoms-more">
-                <a href="{{ $card['url'] }}">Все факты: {{ $card['atoms_total'] }}</a>
-            </div>
-        @endif
-    @endif
+    <div class="nb-card-w-summary">{!! nl2br(e($text)) !!}</div>
 
     @include('moonshine.brain.partials.entry-links', ['card' => $card])
 </article>

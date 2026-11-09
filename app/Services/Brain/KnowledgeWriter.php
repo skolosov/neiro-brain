@@ -16,6 +16,7 @@ final class KnowledgeWriter
     public function __construct(
         private readonly SecretMasker $masker,
         private readonly SyncSettings $syncSettings,
+        private readonly Indexer $indexer,
     ) {}
 
     /**
@@ -67,8 +68,11 @@ final class KnowledgeWriter
             'status' => ($status ?? ($this->syncSettings->auto_approve ? EntryStatus::Approved : EntryStatus::Draft))->value,
             'title' => $title,
             'content' => $content,
+            'summary' => $data->summary !== null ? $this->masker->mask($data->summary)->text : Text::limit($content, 300),
             'details' => $details,
             'project' => $data->project,
+            'theme' => $data->theme,
+            'scope' => $data->scope->value,
             'tags' => $data->tags,
             'importance' => $data->importance,
             'confidence' => $data->confidence,
@@ -83,6 +87,32 @@ final class KnowledgeWriter
         ]);
 
         return ['entry' => $entry, 'created' => true];
+    }
+
+    /**
+     * Replace a card with its new version.
+     *
+     * The old row is kept as history and marked superseded: search stops
+     * returning it, and nothing the user said is destroyed.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function supersede(
+        KnowledgeEntry $old,
+        ExtractedEntry $data,
+        ?KnowledgeSource $source = null,
+        array $metadata = [],
+    ): KnowledgeEntry {
+        $new = $this->write($data, null, $source ?? $old->source, null, $metadata);
+
+        if ($new === null) {
+            return $old;
+        }
+
+        $old->forceFill(['superseded_by' => $new['entry']->getKey()])->save();
+        $this->indexer->index($old);
+
+        return $new['entry'];
     }
 
     /**

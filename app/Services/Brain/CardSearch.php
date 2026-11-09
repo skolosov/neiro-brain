@@ -11,7 +11,6 @@ use App\Services\Brain\Dto\SearchResult;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 /**
  * Card-oriented view on top of BM25: everything the admin cards need in one
@@ -171,8 +170,10 @@ final class CardSearch
      */
     private function cardFromEntry(KnowledgeEntry $entry, ?string $snippet): array
     {
-        $atoms = $this->atoms($entry);
         $tags = array_values(array_filter(array_map('trim', $entry->tags ?? [])));
+        $summary = $entry->summary !== null && trim((string) $entry->summary) !== ''
+            ? (string) $entry->summary
+            : Text::limit((string) $entry->content, 300);
 
         return [
             'id' => (int) $entry->id,
@@ -182,14 +183,16 @@ final class CardSearch
             'status' => $entry->status?->value,
             'status_label' => $entry->status?->label(),
             'project' => $entry->project,
+            'scope' => $entry->scope?->value,
+            'scope_label' => $entry->scope?->label(),
+            'theme' => $entry->theme,
             'tags' => $tags,
             'importance' => (int) $entry->importance,
             'confidence' => (float) $entry->confidence,
             'content' => (string) $entry->content,
+            'summary' => $summary,
             'snippet' => $snippet,
-            'snippet_html' => e($snippet ?? (string) $entry->content),
-            'atoms' => $atoms,
-            'atoms_total' => $this->atomTotal($entry),
+            'snippet_html' => e($snippet ?? $summary),
             'keywords' => $this->keywords($entry),
             'links' => $this->links($entry, $tags),
             'url' => $this->entryUrl($entry),
@@ -199,96 +202,8 @@ final class CardSearch
             'updated_at' => $entry->updated_at?->format('d.m.Y H:i'),
             'last_verified_at' => $entry->last_verified_at?->format('d.m.Y'),
             'source' => $entry->source?->name,
-            'conversation_url' => $this->conversationUrl($entry),
             'indexed' => $entry->indexed_at !== null,
         ];
-    }
-
-    /**
-     * Facts of a card: stored details first, then sentences of the content.
-     *
-     * @return list<array{type: string, text: string}>
-     */
-    public function atoms(KnowledgeEntry $entry, int $limit = 8): array
-    {
-        $atoms = [];
-
-        foreach (preg_split('/\r\n|\r|\n/', (string) $entry->details) ?: [] as $line) {
-            $line = trim(preg_replace('/^[-*•\d.)]+\s*/u', '', $line) ?? $line);
-
-            if ($line === '') {
-                continue;
-            }
-
-            [$type, $text] = $this->atomType($line);
-            $atoms[] = ['type' => $type, 'text' => $text];
-
-            if (count($atoms) >= $limit) {
-                return $atoms;
-            }
-        }
-
-        $content = Text::normalize((string) $entry->content);
-        $sentences = preg_split('/(?<=[.!?…])\s+(?=[A-ZА-ЯЁ0-9«"(])/u', $content) ?: [$content];
-
-        foreach ($sentences as $sentence) {
-            $sentence = trim($sentence);
-
-            if (mb_strlen($sentence) < 12) {
-                continue;
-            }
-
-            [$type, $text] = $this->atomType($sentence);
-            $atoms[] = ['type' => $type, 'text' => $text];
-
-            if (count($atoms) >= $limit) {
-                break;
-            }
-        }
-
-        return $atoms;
-    }
-
-    /**
-     * @return array{0: string, 1: string}
-     */
-    private function atomType(string $text): array
-    {
-        $lower = mb_strtolower($text);
-
-        foreach ([
-            'команда' => ['git ', 'composer ', 'npm ', 'pnpm ', 'yarn ', 'php ', 'artisan', 'docker ', 'curl ', 'cd '],
-            'решение' => ['решили', 'приняли решение', 'договорились', 'выбрали', 'пришли к'],
-            'ошибка' => ['ошибка', 'ошибк', 'не работает', 'падает', 'сломал', 'failed', 'exception'],
-            'стек' => ['laravel', 'postgres', 'php ', 'vue', 'redis', 'docker'],
-            'процесс' => ['каждые', 'раз в ', 'каждый ', 'цикл', 'crud', 'процесс'],
-        ] as $type => $needles) {
-            foreach ($needles as $needle) {
-                if (str_contains($lower, $needle)) {
-                    return [$type, $this->cleanAtom($text)];
-                }
-            }
-        }
-
-        return ['факт', $this->cleanAtom($text)];
-    }
-
-    private function cleanAtom(string $text): string
-    {
-        return Str::of($text)->replaceMatches('/\s+/u', ' ')->trim(' ', '-', '–', '—')->toString();
-    }
-
-    private function atomTotal(KnowledgeEntry $entry): int
-    {
-        $details = trim((string) $entry->details);
-
-        if ($details !== '') {
-            return max(1, substr_count($details, "\n") + 1);
-        }
-
-        $content = Text::normalize((string) $entry->content);
-
-        return max(1, count(preg_split('/[.!?…]+(?=\s|$)/u', $content, -1, PREG_SPLIT_NO_EMPTY) ?: 1));
     }
 
     /**
@@ -320,7 +235,9 @@ final class CardSearch
     }
 
     /**
-     * Links rendered under a card: project, related cards, graph, similar.
+     * Links rendered under a card: the project, the theme it belongs to and the
+     * graph. Two chip types were dropped on purpose — a tag and a related-card
+     * link read better as plain words, and fewer links keep the card scannable.
      *
      * @param  list<string>  $tags
      * @return list<array{type: string, label: string, url: string, icon: string}>
@@ -333,16 +250,14 @@ final class CardSearch
             $links[] = [
                 'type' => 'project',
                 'label' => $project,
-                'url' => $this->graphUrl(['project' => $project]),
+                'url' => $this->searchUrl(['project' => $project]),
                 'icon' => 'folder',
             ];
-        }
-
-        foreach (array_slice($tags, 0, 2) as $tag) {
+        } elseif (($scope = $entry->scope) !== null && $scope->isGlobal()) {
             $links[] = [
-                'type' => 'tag',
-                'label' => $tag,
-                'url' => $this->searchUrl(['q' => $tag]),
+                'type' => 'scope',
+                'label' => $scope->label(),
+                'url' => $this->searchUrl(['scope' => $scope->value]),
                 'icon' => 'tag',
             ];
         }
@@ -355,13 +270,6 @@ final class CardSearch
                 'icon' => 'link',
             ];
         }
-
-        $links[] = [
-            'type' => 'graph',
-            'label' => 'На графе',
-            'url' => $this->graphUrl(['focus' => 'e'.$entry->getKey()]),
-            'icon' => 'graph',
-        ];
 
         return $links;
     }
@@ -387,19 +295,6 @@ final class CardSearch
             'resourceUri' => 'knowledge-entry-resource',
             'pageUri' => 'knowledge-entry-form-page',
             'resourceItem' => $entry->getKey(),
-        ]);
-    }
-
-    private function conversationUrl(KnowledgeEntry $entry): ?string
-    {
-        if ($entry->conversation_id === null) {
-            return null;
-        }
-
-        return route('moonshine.resource.page', [
-            'resourceUri' => 'conversation-resource',
-            'pageUri' => 'conversation-detail-page',
-            'resourceItem' => $entry->conversation_id,
         ]);
     }
 

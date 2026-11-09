@@ -189,6 +189,16 @@ final class TopicMap
         $topics = [];
         $projectKey = $this->key((string) $entry->project);
 
+        // The card's own theme wins: it is the one label the author chose,
+        // whereas tags are search aids and their order carries no meaning.
+        if ($entry->theme !== null && trim((string) $entry->theme) !== '') {
+            $theme = $this->normalize((string) $entry->theme);
+
+            if ($theme !== '' && ! ($projectKey !== '' && $this->key($theme) === $projectKey)) {
+                return [$theme];
+            }
+        }
+
         foreach ($entry->tags ?? [] as $position => $tag) {
             // A tag repeating the project name is not a theme: the project layer
             // of the graph already shows it, so it would duplicate the hub.
@@ -252,7 +262,7 @@ final class TopicMap
     {
         $entries = KnowledgeEntry::query()
             ->when($approvedOnly, fn ($query) => $query->approved())
-            ->get(['id', 'kind', 'tags']);
+            ->get(['id', 'kind', 'tags', 'theme', 'project']);
 
         $counts = [];
 

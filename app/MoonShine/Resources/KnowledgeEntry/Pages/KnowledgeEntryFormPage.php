@@ -6,6 +6,7 @@ namespace App\MoonShine\Resources\KnowledgeEntry\Pages;
 
 use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
+use App\Enums\KnowledgeScope;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
 use MoonShine\Contracts\Core\TypeCasts\DataWrapperContract;
 use MoonShine\Laravel\Pages\Crud\FormPage;
@@ -30,10 +31,14 @@ class KnowledgeEntryFormPage extends FormPage
                 Enum::make('Тип', 'kind')
                     ->attach(KnowledgeKind::class)
                     ->required(),
+                Enum::make('Уровень', 'scope')
+                    ->attach(KnowledgeScope::class)
+                    ->required(),
                 Enum::make('Статус', 'status')
                     ->attach(EntryStatus::class)
                     ->required(),
                 Text::make('Проект', 'project'),
+                Text::make('Тема', 'theme'),
                 Number::make('Важность', 'importance')
                     ->min(1)
                     ->max(5)
@@ -41,7 +46,9 @@ class KnowledgeEntryFormPage extends FormPage
                 Text::make('Теги (через запятую)', 'tags_text'),
             ]),
             Box::make('Содержание', [
-                Textarea::make('Кратко', 'content')->required(),
+                Textarea::make('Описание', 'summary')
+                    ->hint('1–2 предложения: что карточка утверждает. По нему решают, читать ли карточку целиком.'),
+                Textarea::make('Полный текст', 'content')->required(),
                 Textarea::make('Детали', 'details'),
             ]),
         ];
@@ -52,8 +59,11 @@ class KnowledgeEntryFormPage extends FormPage
         return [
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
+            'summary' => ['nullable', 'string', 'max:400'],
             'kind' => ['required', 'string'],
+            'scope' => ['required', 'string'],
             'status' => ['required', 'string'],
+            'theme' => ['nullable', 'string', 'max:64'],
             'importance' => ['nullable', 'integer', 'min:1', 'max:5'],
         ];
     }

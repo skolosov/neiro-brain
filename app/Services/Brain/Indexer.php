@@ -107,7 +107,9 @@ final class Indexer
     {
         $parts = [
             $entry->title,
+            $entry->summary,
             $entry->project,
+            $entry->theme,
             $entry->content,
             $entry->details,
             implode(', ', $entry->tags ?? []),

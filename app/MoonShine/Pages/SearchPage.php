@@ -92,7 +92,7 @@ class SearchPage extends Page
             'topic' => $topic,
             'kinds' => KnowledgeKind::cases(),
             'total' => KnowledgeEntry::query()->count(),
-            'topicCounts' => $topics->counts(36, min: 2),
+            'topicCounts' => $topics->counts(14),
             'selected' => $selected,
             'related' => $related,
             'activeId' => $selected['id'] ?? 0,

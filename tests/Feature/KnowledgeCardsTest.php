@@ -301,7 +301,7 @@ class KnowledgeCardsTest extends TestCase
             ->assertSee('Что лежит в базе');
     }
 
-    public function test_card_panel_includes_atoms_and_keywords(): void
+    public function test_card_panel_carries_the_summary_and_the_text(): void
     {
         $entry = $this->write(
             'Импорт из 1С',
@@ -313,9 +313,11 @@ class KnowledgeCardsTest extends TestCase
 
         $card = app(CardSearch::class)->cardFor($entry);
 
-        $this->assertNotEmpty($card['atoms']);
+        // The card is read as a document: a summary to skim, the text to read.
+        $this->assertNotEmpty($card['summary']);
         $this->assertNotEmpty($card['keywords']);
         $this->assertSame('Sklad', $card['project']);
         $this->assertStringContainsString('1С', $card['content']);
+        $this->assertArrayNotHasKey('atoms', $card);
     }
 }

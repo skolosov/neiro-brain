@@ -188,6 +188,17 @@
     .nb-peek h3 { margin: 0 0 .25rem; font-size: 1rem; line-height: 1.3; }
     .nb-peek-meta { font-size: .72rem; color: var(--nb-muted); margin-bottom: .5rem; }
     .nb-peek-text { font-size: .82rem; line-height: 1.45; }
+    /* The card as a document: lead paragraph, then the body. */
+    .nb-peek-lead {
+        font-size: .88rem;
+        line-height: 1.5;
+        margin: 0 0 .55rem;
+        padding-left: .65rem;
+        border-left: 2px solid var(--nb-accent);
+        color: var(--nb-text);
+    }
+    .nb-peek-body { font-size: .84rem; line-height: 1.55; color: var(--nb-text); }
+    .nb-peek-body a { color: var(--nb-accent); }
     .nb-peek-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: .6rem 0; }
     .nb-peek-grid div { font-size: .78rem; }
     .nb-peek-grid b { display: block; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--nb-muted); font-weight: 600; }
