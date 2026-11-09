@@ -26,20 +26,32 @@ class VerifyBrainToken
 {
     public function handle(Request $request, Closure $next, string $scope = 'api'): Response
     {
-        $expected = $this->expectedTokens($scope);
         $proxyHeader = trim((string) $request->header('X-Neiro-Proxy-Token'));
 
         // Preferred for harnesses: the model provider key stays in Authorization,
         // while Neiro Brain's own token travels in X-Neiro-Proxy-Token.
         $provided = $proxyHeader !== ''
             ? $proxyHeader
-            : ($request->bearerToken() ?: $request->header('x-api-key'));
+            : (string) ($request->bearerToken() ?: $request->header('x-api-key'));
 
-        if ($provided === null || $provided === '' || ! $this->matches($expected, $provided)) {
+        // Прозрачный прокси: ключ провайдера (sk-…) клиент присылает вместо
+        // токена Neiro Brain, сервер его не хранит, а передаёт upstream.
+        if ($scope === 'proxy' && (bool) config('brain.proxy.open', true) && $this->looksLikeProviderKey($provided)) {
+            return $next($request);
+        }
+
+        $expected = $this->expectedTokens($scope);
+
+        if ($provided === '' || ! $this->matches($expected, $provided)) {
             return $this->unauthorized($request, $scope);
         }
 
         return $next($request);
+    }
+
+    private function looksLikeProviderKey(string $token): bool
+    {
+        return str_starts_with(trim($token), 'sk-');
     }
 
     /**

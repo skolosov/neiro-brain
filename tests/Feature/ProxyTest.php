@@ -294,6 +294,32 @@ class ProxyTest extends TestCase
         $this->assertGreaterThanOrEqual(1, (int) $response->headers->get('X-Neiro-Memory-Hits'));
     }
 
+    public function test_proxy_forwards_the_harness_key_upstream(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/anthropic/v1/messages' => Http::response([
+                'id' => 'msg_test',
+                'type' => 'message',
+                'role' => 'assistant',
+                'model' => 'deepseek-flash',
+                'content' => [['type' => 'text', 'text' => 'ok']],
+                'stop_reason' => 'end_turn',
+                'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+            ], 200),
+        ]);
+
+        $this->withHeaders(['x-api-key' => 'sk-harness-key'])
+            ->postJson('/v1/messages', [
+                'model' => 'deepseek-flash',
+                'max_tokens' => 8,
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ])
+            ->assertOk();
+
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.deepseek.com/anthropic/v1/messages'
+            && ($request->header('x-api-key')[0] ?? '') === 'sk-harness-key');
+    }
+
     public function test_proxy_rejects_invalid_token(): void
     {
         $this->postJson('/v1/chat/completions', [

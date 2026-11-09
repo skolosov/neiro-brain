@@ -52,7 +52,7 @@ class ProxyController extends Controller
             return $this->error('The "messages" field is required.', 422, 'openai');
         }
 
-        $upstream = $this->resolveUpstream($request, $payload);
+        $upstream = $this->resolveUpstream($request, $payload, 'openai');
         $configurationError = $this->configurationError($upstream, 'openai');
 
         if ($configurationError !== null) {
@@ -127,7 +127,7 @@ class ProxyController extends Controller
             return $this->error('The "input" field is required.', 422, 'openai');
         }
 
-        $upstream = $this->resolveUpstream($request, $payload);
+        $upstream = $this->resolveUpstream($request, $payload, 'openai');
         $configurationError = $this->configurationError($upstream, 'openai');
 
         if ($configurationError !== null) {
@@ -197,7 +197,7 @@ class ProxyController extends Controller
             return $this->error('The "messages" field is required.', 422, 'anthropic');
         }
 
-        $upstream = $this->resolveUpstream($request, $payload);
+        $upstream = $this->resolveUpstream($request, $payload, 'anthropic');
         $configurationError = $this->configurationError($upstream, 'anthropic');
 
         if ($configurationError !== null) {
@@ -283,7 +283,7 @@ class ProxyController extends Controller
 
     public function models(Request $request): Response
     {
-        $upstream = $this->resolveUpstream($request, []);
+        $upstream = $this->resolveUpstream($request, [], 'openai');
 
         if ($upstream->mock) {
             return response()->json([
@@ -772,28 +772,70 @@ class ProxyController extends Controller
     /**
      * Resolve the upstream from the harness, not from admin settings.
      *
-     * When X-Neiro-Proxy-Token is present, Authorization / x-api-key carries the
-     * provider key chosen by the harness. X-Neiro-Upstream selects the provider.
-     * Older clients that use the proxy token as Authorization keep working.
+     * The proxy is transparent: the key the client sends in Authorization or
+     * x-api-key is the provider key and is forwarded upstream as is, so Neiro
+     * Brain never stores it. If that key is Neiro Brain's own token (legacy
+     * clients), it is not forwarded and the upstream comes from the settings.
+     * X-Neiro-Upstream selects the provider; otherwise it is inferred from the
+     * model name.
      *
      * @param  array<string, mixed>  $payload
      */
-    private function resolveUpstream(Request $request, array $payload): UpstreamConfig
+    private function resolveUpstream(Request $request, array $payload, string $protocol = 'openai'): UpstreamConfig
     {
         $hasProxyToken = trim((string) $request->header('X-Neiro-Proxy-Token')) !== '';
+        $provided = $request->bearerToken() ?: $request->header('x-api-key');
+        $provided = is_string($provided) ? trim($provided) : '';
 
-        $providerKey = $hasProxyToken
-            ? ($request->bearerToken() ?: $request->header('x-api-key'))
-            : null;
+        $providerKey = null;
+
+        $openProxy = (bool) config('brain.proxy.open', true);
+
+        if ($provided !== '' && ($hasProxyToken || ($openProxy && str_starts_with($provided, 'sk-')))) {
+            $providerKey = $provided !== $this->brainToken() ? $provided : null;
+        }
 
         $requestedUpstream = $request->header('X-Neiro-Upstream');
+        $requestedUpstream = is_string($requestedUpstream) && trim($requestedUpstream) !== ''
+            ? trim($requestedUpstream)
+            : $this->inferUpstream($payload, $providerKey);
 
         return $this->resolver->resolve(
             $this->settings,
             isset($payload['model']) ? (string) $payload['model'] : null,
-            is_string($requestedUpstream) && trim($requestedUpstream) !== '' ? trim($requestedUpstream) : null,
-            is_string($providerKey) && trim($providerKey) !== '' ? trim($providerKey) : null,
+            $requestedUpstream,
+            $providerKey,
+            $protocol,
         );
+    }
+
+    private function brainToken(): string
+    {
+        $unified = trim((string) config('brain.tokens.all', ''));
+
+        return $unified !== '' ? $unified : trim((string) $this->settings->access_token);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function inferUpstream(array $payload, ?string $providerKey): ?string
+    {
+        if ($providerKey === null) {
+            return null;
+        }
+
+        $model = strtolower((string) ($payload['model'] ?? ''));
+
+        return match (true) {
+            str_starts_with($model, 'deepseek') => 'deepseek',
+            str_starts_with($model, 'claude') => 'anthropic',
+            str_starts_with($model, 'gpt'),
+            str_starts_with($model, 'o1'),
+            str_starts_with($model, 'o3'),
+            str_starts_with($model, 'o4') => 'openai',
+            default => null,
+        };
     }
 
     private function configurationError(UpstreamConfig $upstream, string $format): ?JsonResponse

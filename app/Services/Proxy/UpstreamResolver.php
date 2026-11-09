@@ -19,6 +19,12 @@ final class UpstreamResolver
     ];
 
     /** @var array<string, string> */
+    private const ANTHROPIC_BASE_URLS = [
+        'deepseek' => 'https://api.deepseek.com/anthropic/v1',
+        'anthropic' => 'https://api.anthropic.com/v1',
+    ];
+
+    /** @var array<string, string> */
     private const KEY_ENV = [
         'openai' => 'OPENAI_API_KEY',
         'deepseek' => 'DEEPSEEK_API_KEY',
@@ -32,6 +38,7 @@ final class UpstreamResolver
         ?string $requestedModel = null,
         ?string $requestedUpstream = null,
         ?string $requestedKey = null,
+        ?string $protocol = null,
     ): UpstreamConfig {
         $driver = strtolower(trim($requestedUpstream ?: $settings->upstream ?: 'mock'));
 
@@ -49,7 +56,9 @@ final class UpstreamResolver
         $baseUrl = trim($settings->base_url);
 
         if ($baseUrl === '') {
-            $baseUrl = self::DEFAULT_BASE_URLS[$driver] ?? '';
+            $baseUrl = $protocol === 'anthropic'
+                ? (self::ANTHROPIC_BASE_URLS[$driver] ?? self::DEFAULT_BASE_URLS[$driver] ?? '')
+                : (self::DEFAULT_BASE_URLS[$driver] ?? '');
         }
 
         $apiKey = trim((string) $requestedKey);
