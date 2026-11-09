@@ -92,6 +92,7 @@
     .nb-card-w-link-project { margin-left: auto; font-weight: 600; color: var(--nb-accent); }
 
     .nb-results { display: flex; flex-direction: column; gap: 1rem; }
+    .nb-results.nb-entry-list { gap: .1rem; }
     .nb-results-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem; }
     .nb-results-title { margin: 0; font-size: 1rem; font-weight: 650; }
     .nb-results-meta { font-size: .75rem; color: var(--nb-muted); }
@@ -208,13 +209,60 @@
 
     /* Two-column "list + detail" search page */
     .nb-search-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-    /* The open card is read here, so the panel gets room for a comfortable line
-       length; the list beside it is only a table of contents. */
+    /* Reading the open card is the main job here, so the panel gets the room
+       and the list beside it stays a compact table of contents. */
     @media (min-width: 1280px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 34rem; align-items: start; } }
-    @media (min-width: 1680px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 42rem; align-items: start; } }
+    @media (min-width: 1680px) { .nb-search-layout { grid-template-columns: minmax(0, 1fr) 46rem; } }
     .nb-search-main { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
     .nb-search-side { display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 1rem; }
-    .nb-search-side .nb-peek-card { padding: 1.1rem 1.3rem; }
-    .nb-search-side .nb-peek-body { font-size: .92rem; line-height: 1.65; max-width: 68ch; }
-    .nb-search-side .nb-peek-lead { font-size: .95rem; line-height: 1.6; max-width: 68ch; }
+    .nb-search-side .nb-peek-card { padding: 1.2rem 1.5rem; }
+    .nb-search-side .nb-peek-body { font-size: .95rem; line-height: 1.7; max-width: 70ch; color: var(--nb-text); }
+    .nb-search-side .nb-peek-lead { font-size: 1rem; line-height: 1.6; max-width: 70ch; }
+    .nb-search-side .nb-peek h3 { font-size: 1.25rem; line-height: 1.3; }
+
+    /* The list: one line per card. */
+    .nb-entry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .1rem; }
+    .nb-entry-row { margin: 0; padding: 0; }
+    .nb-entry-row-link {
+        display: grid;
+        grid-template-columns: 7rem minmax(0, 1fr) auto;
+        gap: .9rem;
+        align-items: baseline;
+        padding: .55rem .7rem;
+        border-radius: .35rem;
+        text-decoration: none;
+        border-left: 2px solid transparent;
+    }
+    .nb-entry-row-link:hover { background: rgba(127, 127, 127, .09); }
+    .nb-entry-row.is-active .nb-entry-row-link {
+        background: var(--nb-accent-soft);
+        border-left-color: var(--nb-accent);
+    }
+    .nb-entry-row-theme {
+        font-size: .68rem;
+        font-weight: 700;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--nb-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .nb-entry-row.is-active .nb-entry-row-theme { color: var(--nb-accent); }
+    .nb-entry-row-body { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+    .nb-entry-row-title { font-size: .92rem; font-weight: 600; color: var(--nb-text); line-height: 1.35; }
+    .nb-entry-row-summary {
+        font-size: .8rem;
+        line-height: 1.4;
+        color: var(--nb-muted);
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .nb-entry-row-project { font-size: .72rem; color: var(--nb-muted); white-space: nowrap; }
+    @media (max-width: 720px) {
+        .nb-entry-row-link { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
+        .nb-entry-row-project { display: none; }
+    }
 </style>

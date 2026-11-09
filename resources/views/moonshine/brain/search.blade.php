@@ -95,23 +95,22 @@
             @endif
 
             @php
-                // The open card is shown in the right-hand panel in full, so
-                // repeating it in the list would only waste the reader's eye.
-                $listCards = array_values(array_filter(
-                    $result['cards'],
-                    fn (array $card): bool => $card['id'] !== $activeId,
-                ));
+                // The open card is shown in the right-hand panel in full, so the
+                // list marks it instead of repeating it.
+                $resultIds = array_column($result['cards'], 'id');
+                $activeOutside = $activeId > 0 && ! in_array($activeId, $resultIds, true);
             @endphp
 
-            @if ($selected !== null && $listCards === [])
+            @if ($activeOutside && $selected !== null)
                 <div class="nb-empty-hint">
-                    Это единственная карточка по фильтру. Её полный текст — справа.
+                    Открыта карточка «{{ $selected['title'] }}» — она не входит в этот список,
+                    полный текст справа. <a href="{{ $pageUrl }}">Показать список</a>
                 </div>
             @endif
 
-            <div class="nb-results">
-                @foreach ($listCards as $card)
-                    @include('moonshine.brain.partials.knowledge-card', ['card' => $card, 'mode' => 'grid'])
+            <div class="nb-results nb-entry-list">
+                @foreach ($result['cards'] as $card)
+                    @include('moonshine.brain.partials.knowledge-card', ['card' => $card, 'activeId' => $activeId])
                 @endforeach
             </div>
         </div>
