@@ -146,7 +146,8 @@ class KnowledgeCardsTest extends TestCase
 
         $topics = app(TopicMap::class);
 
-        $this->assertSame(['Поиск', 'Архитектура'], $topics->of($tagged));
+        // Broader themes come first: "Архитектура" outranks the narrower "Поиск".
+        $this->assertSame(['Архитектура', 'Поиск'], $topics->of($tagged));
         $this->assertSame(['Стиль работы'], $topics->of($untagged));
 
         $counts = $topics->counts();

@@ -34,25 +34,54 @@ final class TopicMap
         'поиск' => 'Поиск',
         'архитектура' => 'Архитектура',
         'architecture' => 'Архитектура',
+        'микросервисы' => 'Архитектура',
+        'микросервис' => 'Архитектура',
+        'монолит' => 'Архитектура',
         'тесты' => 'Тесты',
         'тестирование' => 'Тесты',
         'tests' => 'Тесты',
+        'pest' => 'Тесты',
+        'phpunit' => 'Тесты',
         'деплой' => 'Деплой',
         'deploy' => 'Деплой',
         'ci' => 'Деплой',
+        'openser' => 'Окружение',
+        'openserver' => 'Окружение',
+        'ospanel' => 'Окружение',
+        'окружение' => 'Окружение',
+        'windows' => 'Окружение',
+        'api' => 'API',
+        'прокси' => 'Прокси',
+        'proxy' => 'Прокси',
         'openai' => 'LLM',
         'deepseek' => 'LLM',
         'llm' => 'LLM',
         'claude' => 'LLM',
         'процессы' => 'Процессы',
         'process' => 'Процессы',
+        'коммуникация' => 'Процессы',
         'preferences' => 'Предпочтения',
         'preference' => 'Предпочтения',
         'profile' => 'Профиль',
+        'команда' => 'Команда',
+        '1с' => '1С',
+        '1c' => '1С',
+        'bitrix' => '1С',
+        'интеграции' => 'Интеграции',
+        'интеграция' => 'Интеграции',
+        'идемпотентность' => 'Интеграции',
+        'админка' => 'Админка',
+        'moonshine' => 'Админка',
+        'стиль' => 'Стиль работы',
+        'стиль работы' => 'Стиль работы',
     ];
 
     /**
-     * Topics of one entry.
+     * Topics of one entry, most significant first.
+     *
+     * A card gets at most two topics: a card tagged "lagging, postgres, vue,
+     * стек" is about the stack, not about four unrelated themes. Extra tags stay
+     * on the card for search — they just don't become graph nodes.
      *
      * @return list<string>
      */
@@ -60,19 +89,41 @@ final class TopicMap
     {
         $topics = [];
 
-        foreach ($entry->tags ?? [] as $tag) {
+        foreach ($entry->tags ?? [] as $position => $tag) {
             $topic = $this->normalize((string) $tag);
 
-            if ($topic !== '') {
-                $topics[$topic] = true;
+            if ($topic === '') {
+                continue;
             }
+
+            // Keep the first raw position so equally important themes stay in
+            // the order the extractor wrote them.
+            $topics[$topic] ??= [
+                'priority' => $this->priority($topic),
+                'position' => $position,
+            ];
         }
 
         if ($topics === []) {
-            $topics[$this->kindTopic($entry)] = true;
+            return [$this->kindTopic($entry)];
         }
 
-        return array_keys($topics);
+        uasort($topics, fn (array $left, array $right): int => [$right['priority'], $left['position']] <=> [$left['priority'], $right['position']]);
+
+        return array_slice(array_keys($topics), 0, 3);
+    }
+
+    /**
+     * Broader themes beat narrow ones when a card can only carry two.
+     */
+    private function priority(string $topic): int
+    {
+        return match (true) {
+            in_array($topic, ['Архитектура', 'Процессы', 'Предпочтения', 'Профиль', 'Компания', 'Стиль работы'], true) => 5,
+            in_array($topic, ['Стек', 'Поиск', 'Тесты', 'Деплой', 'Интеграции', 'LLM', 'Админка'], true) => 4,
+            mb_strlen($topic) <= 4 => 2,
+            default => 3,
+        };
     }
 
     /**

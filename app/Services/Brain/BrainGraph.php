@@ -30,7 +30,10 @@ use Illuminate\Support\Str;
 final class BrainGraph
 {
     /** Entries must share at least this many keywords to be linked directly. */
-    private const SHARED_KEYWORDS = 3;
+    private const SHARED_KEYWORDS = 5;
+
+    /** Keep the graph readable: each entry links to its few closest neighbours. */
+    private const KEYWORD_EDGES_PER_ENTRY = 2;
 
     private const KEYWORD_LIMIT = 64;
 
@@ -106,11 +109,17 @@ final class BrainGraph
         foreach ($entries as $entry) {
             $project = trim((string) $entry->project);
 
-            if ($project !== '') {
+            if ($project !== '' && isset($nodes['p'.$project])) {
                 $edges['p'.$project.'|e'.$entry->id] = new GraphEdge('p'.$project, 'e'.$entry->id, 1);
             }
 
             foreach ($this->topics->of($entry) as $topic) {
+                // A topic node exists only when the theme is shared, so the edge
+                // must not point at a node that was filtered out.
+                if (! isset($nodes['t'.$topic])) {
+                    continue;
+                }
+
                 $edges['t'.$topic.'|e'.$entry->id] = new GraphEdge('t'.$topic, 'e'.$entry->id, 1);
             }
         }
@@ -183,16 +192,23 @@ final class BrainGraph
     }
 
     /**
+     * Only themes shared by at least two cards become nodes: a topic used once
+     * is just a tag of that card and would turn the graph into a star of
+     * one-off labels.
+     *
      * @param  Collection<int, KnowledgeEntry>  $entries
      * @return array<string, GraphNode>
      */
     private function topicNodes(Collection $entries, callable $url): array
     {
         $nodes = [];
-        $grouped = $this->topics->group($entries);
 
-        foreach ($grouped as $topic => $items) {
-            $importance = (int) $items->avg('importance');
+        foreach ($this->topics->group($entries) as $topic => $items) {
+            // On a small base every theme is worth showing; once the base grows,
+            // a theme used by a single card is just that card's tag.
+            if ($items->count() < ($entries->count() < 20 ? 1 : 2)) {
+                continue;
+            }
 
             $nodes['t'.$topic] = new GraphNode(
                 id: 't'.$topic,
@@ -202,7 +218,7 @@ final class BrainGraph
                 subtitle: 'Тема',
                 kind: 'topic',
                 status: '',
-                importance: $importance,
+                importance: (int) $items->avg('importance'),
                 project: '',
                 tags: [],
                 summary: '',
@@ -266,6 +282,9 @@ final class BrainGraph
     }
 
     /**
+     * Keyword links, pruned to the strongest neighbours of every entry so the
+     * graph stays readable instead of turning into a hairball.
+     *
      * @param  array<int, array<string, int>>  $keywordsByEntry
      * @return list<GraphEdge>
      */
@@ -278,7 +297,7 @@ final class BrainGraph
         }
 
         $ids = array_keys($pairs);
-        $edges = [];
+        $candidates = [];
 
         for ($i = 0; $i < count($ids); $i++) {
             for ($j = $i + 1; $j < count($ids); $j++) {
@@ -288,8 +307,26 @@ final class BrainGraph
                     continue;
                 }
 
-                $edges[] = new GraphEdge('e'.$ids[$i], 'e'.$ids[$j], $shared);
+                $candidates[] = new GraphEdge('e'.$ids[$i], 'e'.$ids[$j], $shared);
             }
+        }
+
+        usort($candidates, fn (GraphEdge $left, GraphEdge $right): int => $right->weight <=> $left->weight);
+
+        $degree = [];
+        $edges = [];
+
+        foreach ($candidates as $edge) {
+            $left = $edge->source;
+            $right = $edge->target;
+
+            if (($degree[$left] ?? 0) >= self::KEYWORD_EDGES_PER_ENTRY || ($degree[$right] ?? 0) >= self::KEYWORD_EDGES_PER_ENTRY) {
+                continue;
+            }
+
+            $degree[$left] = ($degree[$left] ?? 0) + 1;
+            $degree[$right] = ($degree[$right] ?? 0) + 1;
+            $edges[] = $edge;
         }
 
         return $edges;
