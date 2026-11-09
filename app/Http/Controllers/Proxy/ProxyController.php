@@ -69,7 +69,7 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeOpenAi($payload);
-        $payload['messages'] = $this->sanitizeOpenAiMessages($payload['messages']);
+        $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
 
         $headers = [
             'X-Neiro-Memory-Hits' => (string) count($hits),
@@ -149,6 +149,14 @@ class ProxyController extends Controller
 
         $payload = $this->toolSchemas->normalizeOpenAi($payload);
 
+        if (is_array($payload['messages'] ?? null)) {
+            $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
+        }
+
+        if (is_array($payload['input'] ?? null)) {
+            $payload['input'] = $this->sanitizeMessageContents($payload['input']);
+        }
+
         $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
 
         if ($conversation !== null) {
@@ -215,7 +223,7 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeAnthropic($payload);
-        $payload['messages'] = $this->sanitizeAnthropicMessages($payload['messages']);
+        $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
 
         $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
 
@@ -261,6 +269,11 @@ class ProxyController extends Controller
     public function countTokens(Request $request): Response
     {
         $payload = $request->json()->all();
+
+        if (is_array($payload['messages'] ?? null)) {
+            $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
+        }
+
         $upstream = $this->resolveUpstream($request, $payload);
 
         if ($upstream->mock) {
@@ -810,15 +823,19 @@ class ProxyController extends Controller
     }
 
     /**
-     * Strict OpenAI-compatible gateways reject a null message content, and the
-     * harness sends null for assistant turns that carry no text (tool calls
-     * only) or for an empty tool result. Normalizing it to an empty string
-     * keeps the proxy transparent for the client without changing semantics.
+     * Strict gateways reject null where they expect text. The harness sends
+     * content => null for assistant turns that carry only tool calls, a null
+     * text block when it replays an interrupted turn, and a null tool result.
+     * Normalizing them to empty strings keeps the proxy transparent.
      *
-     * @param  array<int, mixed>  $messages
-     * @return array<int, mixed>
+     * Every endpoint that forwards messages upstream goes through here: each
+     * provider validates the same structure on its own side, so a value that
+     * passes one protocol unchanged still breaks another.
+     *
+     * @param  array<int|string, mixed>  $messages
+     * @return array<int|string, mixed>
      */
-    private function sanitizeOpenAiMessages(array $messages): array
+    private function sanitizeMessageContents(array $messages): array
     {
         foreach ($messages as $index => $message) {
             if (! is_array($message)) {
@@ -828,33 +845,22 @@ class ProxyController extends Controller
             if (array_key_exists('content', $message) && $message['content'] === null) {
                 $messages[$index]['content'] = '';
             }
-        }
 
-        return $messages;
-    }
-
-    /**
-     * Strict gateways reject a null text value inside a content block, and the
-     * harness may produce one when it replays an interrupted assistant turn.
-     * Normalizing it here keeps the proxy transparent for the client.
-     *
-     * @param  array<int, mixed>  $messages
-     * @return array<int, mixed>
-     */
-    private function sanitizeAnthropicMessages(array $messages): array
-    {
-        foreach ($messages as $index => $message) {
-            if (! is_array($message) || ! is_array($message['content'] ?? null)) {
+            if (! is_array($messages[$index]['content'] ?? null)) {
                 continue;
             }
 
-            foreach ($message['content'] as $blockIndex => $block) {
+            foreach ($messages[$index]['content'] as $blockIndex => $block) {
                 if (! is_array($block)) {
                     continue;
                 }
 
-                if (($block['type'] ?? null) === 'text' && array_key_exists('text', $block) && $block['text'] === null) {
+                if (array_key_exists('text', $block) && $block['text'] === null) {
                     $messages[$index]['content'][$blockIndex]['text'] = '';
+                }
+
+                if (array_key_exists('content', $block) && $block['content'] === null) {
+                    $messages[$index]['content'][$blockIndex]['content'] = '';
                 }
             }
         }

@@ -334,7 +334,10 @@ class ProxyTest extends TestCase
             ], 200),
         ]);
 
-        $this->withHeaders(['x-api-key' => 'sk-harness-key'])
+        $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'x-api-key' => 'sk-harness-key',
+        ])
             ->postJson('/v1/messages', [
                 'model' => 'deepseek-flash',
                 'max_tokens' => 8,
@@ -426,6 +429,81 @@ class ProxyTest extends TestCase
             }
 
             return true;
+        });
+    }
+
+    public function test_null_content_is_normalized_on_every_message_endpoint(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'deepseek-flash',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+            ]),
+        ]);
+
+        $headers = [
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+        ];
+
+        $messages = [
+            ['role' => 'user', 'content' => 'test'],
+            ['role' => 'assistant', 'content' => null, 'tool_calls' => []],
+            ['role' => 'tool', 'tool_call_id' => 'call_1', 'content' => null],
+        ];
+
+        $this->withHeaders($headers)->postJson('/v1/responses', [
+            'model' => 'deepseek-flash',
+            'messages' => $messages,
+        ])->assertOk();
+
+        $this->withHeaders($headers)->postJson('/v1/responses', [
+            'model' => 'deepseek-flash',
+            'input' => $messages,
+        ])->assertOk();
+
+        $this->withHeaders($headers)->postJson('/v1/messages', [
+            'model' => 'deepseek-flash',
+            'max_tokens' => 10,
+            'messages' => [
+                ['role' => 'assistant', 'content' => null],
+                ['role' => 'assistant', 'content' => [['type' => 'text', 'text' => null]]],
+                ['role' => 'user', 'content' => [['type' => 'tool_result', 'tool_use_id' => 'call_1', 'content' => null]]],
+            ],
+        ])->assertOk();
+
+        Http::assertNotSent(function (Request $request): bool {
+            foreach (['messages', 'input'] as $key) {
+                foreach ($request->data()[$key] ?? [] as $message) {
+                    if (! is_array($message)) {
+                        continue;
+                    }
+
+                    if (array_key_exists('content', $message) && $message['content'] === null) {
+                        return true;
+                    }
+
+                    foreach ((array) ($message['content'] ?? []) as $block) {
+                        if (is_array($block) && array_key_exists('text', $block) && $block['text'] === null) {
+                            return true;
+                        }
+
+                        if (is_array($block) && array_key_exists('content', $block) && $block['content'] === null) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
         });
     }
 }
