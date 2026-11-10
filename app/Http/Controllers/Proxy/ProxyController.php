@@ -819,9 +819,12 @@ class ProxyController extends Controller
      * text block when it replays an interrupted turn, and a null tool result.
      * Normalizing them to empty strings keeps the proxy transparent.
      *
-     * Every endpoint that forwards messages upstream goes through here: each
-     * provider validates the same structure on its own side, so a value that
-     * passes one protocol unchanged still breaks another.
+     * The walk is recursive on purpose: the same value hides at different
+     * depths in different protocols — messages[i].content, content[j].text,
+     * tool_result.content, input[i].content — and one missed level reaches a
+     * gateway that answers with a raw deserialization error instead of a
+     * readable one. Only keys named content and text are touched; tool schemas
+     * live under the separate `tools` key and are never traversed here.
      *
      * @param  array<int|string, mixed>  $messages
      * @return array<int|string, mixed>
@@ -830,38 +833,24 @@ class ProxyController extends Controller
     {
         $normalized = 0;
 
-        foreach ($messages as $index => $message) {
-            if (! is_array($message)) {
-                continue;
-            }
+        $walk = function (array $node) use (&$walk, &$normalized): array {
+            foreach ($node as $key => $value) {
+                if (is_array($value)) {
+                    $node[$key] = $walk($value);
 
-            if (array_key_exists('content', $message) && $message['content'] === null) {
-                $messages[$index]['content'] = '';
-                $normalized++;
-            }
-
-            if (! is_array($messages[$index]['content'] ?? null)) {
-                continue;
-            }
-
-            foreach ($messages[$index]['content'] as $blockIndex => $block) {
-                if (! is_array($block)) {
                     continue;
                 }
 
-                if (array_key_exists('text', $block) && $block['text'] === null) {
-                    $messages[$index]['content'][$blockIndex]['text'] = '';
-                    $normalized++;
-                }
-
-                if (array_key_exists('content', $block) && $block['content'] === null) {
-                    $messages[$index]['content'][$blockIndex]['content'] = '';
+                if ($value === null && ($key === 'content' || $key === 'text')) {
+                    $node[$key] = '';
                     $normalized++;
                 }
             }
-        }
 
-        return $messages;
+            return $node;
+        };
+
+        return $walk($messages);
     }
 
     /**
