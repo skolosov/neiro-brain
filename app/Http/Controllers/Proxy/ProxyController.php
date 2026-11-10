@@ -69,10 +69,11 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeOpenAi($payload);
-        $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
+        $payload['messages'] = $this->sanitizeMessageContents($payload['messages'], $normalized);
 
         $headers = [
             'X-Neiro-Memory-Hits' => (string) count($hits),
+            'X-Neiro-Normalized' => (string) $normalized,
         ];
 
         if ($conversation !== null) {
@@ -96,10 +97,7 @@ class ProxyController extends Controller
             ->post($upstream->url('chat/completions'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         $data = $response->json();
@@ -148,16 +146,21 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeOpenAi($payload);
+        $normalized = 0;
 
         if (is_array($payload['messages'] ?? null)) {
-            $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
+            $payload['messages'] = $this->sanitizeMessageContents($payload['messages'], $normalized);
         }
 
         if (is_array($payload['input'] ?? null)) {
-            $payload['input'] = $this->sanitizeMessageContents($payload['input']);
+            $payload['input'] = $this->sanitizeMessageContents($payload['input'], $inputNormalized);
+            $normalized += $inputNormalized;
         }
 
-        $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
+        $headers = [
+            'X-Neiro-Memory-Hits' => (string) count($hits),
+            'X-Neiro-Normalized' => (string) $normalized,
+        ];
 
         if ($conversation !== null) {
             $headers['X-Neiro-Conversation'] = (string) $conversation->id;
@@ -180,10 +183,7 @@ class ProxyController extends Controller
             ->post($upstream->url('responses'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         $data = $response->json();
@@ -223,9 +223,12 @@ class ProxyController extends Controller
         }
 
         $payload = $this->toolSchemas->normalizeAnthropic($payload);
-        $payload['messages'] = $this->sanitizeMessageContents($payload['messages']);
+        $payload['messages'] = $this->sanitizeMessageContents($payload['messages'], $normalized);
 
-        $headers = ['X-Neiro-Memory-Hits' => (string) count($hits)];
+        $headers = [
+            'X-Neiro-Memory-Hits' => (string) count($hits),
+            'X-Neiro-Normalized' => (string) $normalized,
+        ];
 
         if ($conversation !== null) {
             $headers['X-Neiro-Conversation'] = (string) $conversation->id;
@@ -248,10 +251,7 @@ class ProxyController extends Controller
             ->post($upstream->url('messages'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         $data = $response->json();
@@ -358,10 +358,7 @@ class ProxyController extends Controller
             ->post($upstream->url('chat/completions'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -436,10 +433,7 @@ class ProxyController extends Controller
             ->post($upstream->url('messages'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -513,10 +507,7 @@ class ProxyController extends Controller
             ->post($upstream->url('responses'), $payload);
 
         if ($response->failed()) {
-            return response($response->body(), $response->status(), [
-                'Content-Type' => $response->header('Content-Type') ?: 'application/json',
-                ...$headers,
-            ]);
+            return $this->upstreamFailure($response, $headers);
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -835,8 +826,10 @@ class ProxyController extends Controller
      * @param  array<int|string, mixed>  $messages
      * @return array<int|string, mixed>
      */
-    private function sanitizeMessageContents(array $messages): array
+    private function sanitizeMessageContents(array $messages, ?int &$normalized = null): array
     {
+        $normalized = 0;
+
         foreach ($messages as $index => $message) {
             if (! is_array($message)) {
                 continue;
@@ -844,6 +837,7 @@ class ProxyController extends Controller
 
             if (array_key_exists('content', $message) && $message['content'] === null) {
                 $messages[$index]['content'] = '';
+                $normalized++;
             }
 
             if (! is_array($messages[$index]['content'] ?? null)) {
@@ -857,15 +851,41 @@ class ProxyController extends Controller
 
                 if (array_key_exists('text', $block) && $block['text'] === null) {
                     $messages[$index]['content'][$blockIndex]['text'] = '';
+                    $normalized++;
                 }
 
                 if (array_key_exists('content', $block) && $block['content'] === null) {
                     $messages[$index]['content'][$blockIndex]['content'] = '';
+                    $normalized++;
                 }
             }
         }
 
         return $messages;
+    }
+
+    /**
+     * Pass an upstream error through unchanged while leaving a trace that
+     * separates a client-side problem from an upstream rejection: the
+     * normalized counter shows how many null values this proxy repaired.
+     *
+     * @param  array<string, string>  $headers
+     */
+    private function upstreamFailure(\Illuminate\Http\Client\Response $response, array $headers): Response
+    {
+        if ($response->status() >= 400 && $response->status() < 500) {
+            Log::warning('Proxy upstream rejected the request.', [
+                'upstream' => (string) $response->effectiveUri(),
+                'status' => $response->status(),
+                'normalized' => (string) ($headers['X-Neiro-Normalized'] ?? '0'),
+                'body' => mb_substr((string) $response->body(), 0, 300),
+            ]);
+        }
+
+        return response($response->body(), $response->status(), [
+            'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+            ...$headers,
+        ]);
     }
 
     private function brainToken(): string

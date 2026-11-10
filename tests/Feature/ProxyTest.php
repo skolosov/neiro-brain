@@ -506,4 +506,37 @@ class ProxyTest extends TestCase
             return false;
         });
     }
+
+    public function test_normalized_null_count_is_reported_in_the_header(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'id' => 'chatcmpl-test',
+                'object' => 'chat.completion',
+                'created' => time(),
+                'model' => 'deepseek-flash',
+                'choices' => [[
+                    'index' => 0,
+                    'message' => ['role' => 'assistant', 'content' => 'ok'],
+                    'finish_reason' => 'stop',
+                ]],
+            ]),
+        ]);
+
+        $response = $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+        ])->postJson('/v1/chat/completions', [
+            'model' => 'deepseek-flash',
+            'messages' => [
+                ['role' => 'user', 'content' => 'test'],
+                ['role' => 'assistant', 'content' => null],
+                ['role' => 'tool', 'tool_call_id' => 'call_1', 'content' => null],
+            ],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('2', $response->headers->get('X-Neiro-Normalized'));
+    }
 }
