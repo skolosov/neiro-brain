@@ -91,7 +91,7 @@ Ollama `http://127.0.0.1:11434/v1`, Anthropic `https://api.anthropic.com/v1`.
 
 ```bash
 curl http://neiro-brain.local/v1/chat/completions \
-  -H "Authorization: Bearer dev-proxy-token" \
+  -H "Authorization: Bearer dev-brain-token" \
   -H "Content-Type: application/json" \
   -H "X-Neiro-Session: demo" \
   -d '{

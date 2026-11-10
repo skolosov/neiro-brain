@@ -59,13 +59,8 @@ class BrainAdminController extends Controller
 
         $token = 'nb-'.Str::random(40);
 
-        $proxy = app(ProxySettings::class);
-        $proxy->access_token = $token;
-        $proxy->save();
-
         $security = app(SecuritySettings::class);
-        $security->mcp_token = $token;
-        $security->api_token = $token;
+        $security->access_token = $token;
         $security->save();
 
         return back()->with('brain_generated', 'access');
@@ -138,10 +133,6 @@ class BrainAdminController extends Controller
 
         $newToken = (string) ($validated['access_token'] ?? '');
 
-        if ($newToken !== '') {
-            $proxy->access_token = $newToken;
-        }
-
         $proxy->save();
 
         $sync = app(SyncSettings::class);
@@ -157,8 +148,7 @@ class BrainAdminController extends Controller
         $security->mask_emails = $request->boolean('security_mask_emails');
 
         if ($newToken !== '') {
-            $security->mcp_token = $newToken;
-            $security->api_token = $newToken;
+            $security->access_token = $newToken;
         }
 
         $security->save();

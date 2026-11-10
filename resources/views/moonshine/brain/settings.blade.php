@@ -2,9 +2,7 @@
 
 @php
     $reveal = fn (?string $token): string => $token !== null && $token !== '' ? $token : 'не задан';
-    $unifiedToken = count(array_unique([$proxy->access_token, $security->mcp_token, $security->api_token])) === 1
-        ? $proxy->access_token
-        : null;
+    $accessToken = (string) ($security->access_token ?: config('brain.tokens.all'));
 @endphp
 
 <div class="nb-page">
@@ -53,21 +51,17 @@
                     <div>
                         <div class="nb-label" style="margin:0">Токен</div>
                         <div class="nb-help" style="margin:0">
-                            @if ($unifiedToken !== null)
-                                Действует во всех трёх каналах.
-                            @else
-                                Каналы пока используют разные токены — нажмите «Сгенерировать новый», чтобы остался один.
-                            @endif
+                            Действует во всех трёх каналах.
                         </div>
                     </div>
-                    <div class="nb-token-value"><code id="nb-token">{{ $reveal($unifiedToken ?? $proxy->access_token) }}</code></div>
+                    <div class="nb-token-value"><code id="nb-token">{{ $reveal($accessToken) }}</code></div>
                 </div>
                 <div class="nb-token-actions">
                     <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-token">Скопировать</button>
                     <button type="submit" class="nb-btn nb-btn-secondary"
                             formaction="{{ route('brain.admin.tokens.generate') }}"
                             name="action_generate_token" value="all"
-                            onclick="return confirm('Сгенерировать новый токен? Он заменит все три сразу, и клиенты перестанут работать, пока вы не обновите токен в них.')">
+                            onclick="return confirm('Сгенерировать новый токен? Клиенты перестанут работать, пока вы не обновите токен в них.')">
                         Сгенерировать новый
                     </button>
                 </div>
