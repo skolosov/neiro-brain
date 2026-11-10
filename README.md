@@ -139,7 +139,7 @@ php artisan brain:sync --force
 OPENAI_BASE_URL=http://neiro-brain.local/v1
 OPENAI_API_KEY=<ключ провайдера, например DeepSeek>
 # дополнительные заголовки клиента:
-# X-Neiro-Proxy-Token: dev-proxy-token
+# X-Neiro-Proxy-Token: dev-brain-token
 # X-Neiro-Upstream: deepseek
 ```
 
@@ -149,14 +149,14 @@ OPENAI_API_KEY=<ключ провайдера, например DeepSeek>
 
 Если клиент не умеет задавать дополнительные заголовки, используйте fallback:
 положите ключ провайдера в `DEEPSEEK_API_KEY` окружения PHP и передавайте
-`Authorization: Bearer dev-proxy-token` как раньше.
+`Authorization: Bearer dev-brain-token` как раньше.
 
 ### Claude Code / Anthropic SDK
 
 ```bash
 export ANTHROPIC_BASE_URL=http://neiro-brain.local
 export ANTHROPIC_API_KEY=<ключ провайдера>
-# X-Neiro-Proxy-Token: dev-proxy-token
+# X-Neiro-Proxy-Token: dev-brain-token
 # X-Neiro-Upstream: anthropic или deepseek
 ```
 
@@ -177,9 +177,10 @@ upstream как есть. Достаточно
 Режим выключается `BRAIN_PROXY_OPEN=false` — тогда прокси пускает только по
 токену Neiro Brain.
 
-Если не хочется вести три токена, задайте один `BRAIN_TOKEN` в `.env`: он
-принимается и в прокси, и в MCP, и в API одним и тем же значением. Поштучные
-`BRAIN_PROXY_TOKEN`, `BRAIN_MCP_TOKEN` и `BRAIN_API_TOKEN` продолжают работать.
+Токен один на всё: прокси, MCP и API проверяют одно и то же значение.
+Хранится он в настройках (группа `security`), а `BRAIN_TOKEN` в `.env` — только
+начальное значение для пустой настройки. Сменить: админка → Настройки → Токен
+доступа → «Сгенерировать новый», либо `php artisan brain:token --generate`.
 
 ### Заголовки (необязательные)
 
@@ -195,7 +196,7 @@ upstream как есть. Достаточно
 ### MCP
 
 HTTP-сервер: `http://neiro-brain.local/mcp/knowledge`, заголовок
-`Authorization: Bearer dev-mcp-token`.
+`Authorization: Bearer dev-brain-token`.
 
 Пример для клиентов с JSON-конфигом (Claude Desktop, Cursor, Continue):
 
@@ -205,7 +206,7 @@ HTTP-сервер: `http://neiro-brain.local/mcp/knowledge`, заголовок
     "neiro-brain": {
       "url": "http://neiro-brain.local/mcp/knowledge",
       "headers": {
-        "Authorization": "Bearer dev-mcp-token"
+        "Authorization": "Bearer dev-brain-token"
       }
     }
   }
@@ -216,7 +217,7 @@ Claude Code:
 
 ```bash
 claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowledge \
-  --header "Authorization: Bearer dev-mcp-token"
+  --header "Authorization: Bearer dev-brain-token"
 ```
 
 stdio-вариант (без HTTP):
@@ -366,12 +367,12 @@ schtasks /Create /SC MINUTE /MO 1 /TN "Neiro Brain Scheduler" ^
 
 ## API
 
-Токен: `Authorization: Bearer dev-api-token` (меняется в админке).
+Токен: `Authorization: Bearer dev-brain-token` (меняется в админке).
 
 ```bash
 # Приём диалога и немедленная суммаризация
 curl -X POST http://neiro-brain.local/api/v1/ingest \
-  -H "Authorization: Bearer dev-api-token" \
+  -H "Authorization: Bearer dev-brain-token" \
   -H "Content-Type: application/json" \
   -d '{
     "external_id":"chat-2026-11-08",
@@ -385,11 +386,11 @@ curl -X POST http://neiro-brain.local/api/v1/ingest \
 
 # Поиск
 curl "http://neiro-brain.local/api/v1/search?q=архитектура&limit=5" \
-  -H "Authorization: Bearer dev-api-token"
+  -H "Authorization: Bearer dev-brain-token"
 
 # Ручная запись
 curl -X POST http://neiro-brain.local/api/v1/entries \
-  -H "Authorization: Bearer dev-api-token" \
+  -H "Authorization: Bearer dev-brain-token" \
   -H "Content-Type: application/json" \
   -d '{"title":"Стиль кода","content":"Пользователь пишет тесты на Pest.","kind":"style"}'
 ```

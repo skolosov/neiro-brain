@@ -439,9 +439,7 @@ DB_PASSWORD=neiro-local-password
 
 # Прокси по умолчанию ходит в DeepSeek, а не в mock
 BRAIN_PROXY_UPSTREAM=deepseek
-BRAIN_PROXY_TOKEN=dev-proxy-token
-BRAIN_MCP_TOKEN=dev-mcp-token
-BRAIN_API_TOKEN=dev-api-token
+BRAIN_TOKEN=dev-brain-token
 
 MOONSHINE_TITLE="Neiro Brain"
 ```
@@ -644,7 +642,7 @@ chmod 600 ~/.dsh/.env
         apiKeyEnv: DEEPSEEK_API_KEY
         baseURL: http://127.0.0.1:8080/v1
         headers:
-          X-Neiro-Proxy-Token: dev-proxy-token
+          X-Neiro-Proxy-Token: dev-brain-token
           X-Neiro-Upstream: deepseek
         models:
           - id: deepseek-flash
@@ -709,7 +707,7 @@ export DEEPSEEK_API_KEY='sk-...'
 
 curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
   -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-  -H "X-Neiro-Proxy-Token: dev-proxy-token" \
+  -H "X-Neiro-Proxy-Token: dev-brain-token" \
   -H "X-Neiro-Upstream: deepseek" \
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"Ответь одним словом: работает?"}]}'
@@ -734,7 +732,7 @@ curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
         transport: streamable-http
         url: http://127.0.0.1:8080/mcp/knowledge
         headers:
-          Authorization: Bearer dev-mcp-token
+          Authorization: Bearer dev-brain-token
 ```
 
 Пакет `@deepseek-ai/dsh-mcp-client` уже входит в поставку CLI — отдельно ставить
@@ -754,7 +752,7 @@ curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/mcp/knowledge \
-  -H "Authorization: Bearer dev-mcp-token" \
+  -H "Authorization: Bearer dev-brain-token" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
@@ -776,7 +774,7 @@ endpoint с тем же токеном:
   "mcpServers": {
     "neiro-brain": {
       "url": "http://127.0.0.1:8080/mcp/knowledge",
-      "headers": { "Authorization": "Bearer dev-mcp-token" }
+      "headers": { "Authorization": "Bearer dev-brain-token" }
     }
   }
 }
@@ -784,7 +782,7 @@ endpoint с тем же токеном:
 
 ```bash
 claude mcp add --transport http neiro-brain http://127.0.0.1:8080/mcp/knowledge \
-  --header "Authorization: Bearer dev-mcp-token"
+  --header "Authorization: Bearer dev-brain-token"
 ```
 
 OpenAI-совместимым клиентам достаточно поменять base URL на

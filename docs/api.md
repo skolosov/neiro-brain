@@ -1,7 +1,7 @@
 # HTTP API
 
 База: `http://neiro-brain.local/api/v1`  
-Авторизация: `Authorization: Bearer <API-токен>` (админка → Настройки → Безопасность).
+Авторизация: `Authorization: Bearer <токен>` — тот же токен, что у прокси и MCP (админка → Настройки → Токен доступа).
 
 ## POST /ingest
 
@@ -42,7 +42,7 @@
 
 ```bash
 curl "http://neiro-brain.local/api/v1/search?q=стек&project=neiro-brain&limit=3" \
-  -H "Authorization: Bearer dev-api-token"
+  -H "Authorization: Bearer dev-brain-token"
 ```
 
 Ответ: `data[]` с `id`, `title`, `content`, `kind`, `project`, `tags`, `importance`,

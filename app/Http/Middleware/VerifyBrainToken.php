@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Settings\ProxySettings;
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
 use Closure;
@@ -15,12 +14,12 @@ use Throwable;
 /**
  * Bearer-token guard for the proxy, MCP and ingestion API.
  *
- * The proxy accepts the token in either Authorization or x-api-key because
- * Anthropic-compatible clients send the latter.
+ * Один токен на все три входа: значение берётся из настроек группы security,
+ * а если там пусто — из BRAIN_TOKEN (brain.tokens.all). Скоуп влияет только на
+ * формат ответа об ошибке, а не на набор допустимых значений.
  *
- * Besides the per-scope token, a single BRAIN_TOKEN (config brain.tokens.all)
- * is accepted in every scope, so one value can be used for the proxy, MCP and
- * the API at once.
+ * Прокси принимает токен в Authorization или x-api-key, потому что
+ * Anthropic-совместимые клиенты шлют второе.
  */
 class VerifyBrainToken
 {
@@ -34,7 +33,14 @@ class VerifyBrainToken
             ? $proxyHeader
             : (string) ($request->bearerToken() ?: $request->header('x-api-key'));
 
-        $expected = $this->expectedTokens($scope);
+        $expected = $this->expectedToken();
+
+        // Значение из репозитория отбрасываем для всего, что пришло не с самой
+        // машины: иначе публичный сервер пускает по токену, который знает
+        // любой читатель исходников.
+        if ($expected !== '' && ! $this->defaultsAllowed($request) && $this->isShippedDefault($expected)) {
+            $expected = '';
+        }
 
         // Токен в адресе — как в git remote: http://host/<token>/v1 или
         // basic-auth userinfo http://<token>@host/v1.
@@ -62,61 +68,44 @@ class VerifyBrainToken
         return str_starts_with(trim($token), 'sk-');
     }
 
-    /**
-     * Tokens accepted for a scope: the unified BRAIN_TOKEN first, then the
-     * scope's own token.
-     *
-     * @return list<string>
-     */
-    private function expectedTokens(string $scope): array
+    private function isShippedDefault(string $token): bool
     {
-        $tokens = [];
-
-        $unified = trim((string) config('brain.tokens.all', ''));
-
-        if ($unified !== '') {
-            $tokens[] = $unified;
-        }
-
-        $scopeToken = null;
-
-        try {
-            app(SettingsInitializer::class)->ensure();
-            $scopeToken = match ($scope) {
-                'proxy' => app(ProxySettings::class)->access_token,
-                'mcp' => app(SecuritySettings::class)->mcp_token,
-                default => app(SecuritySettings::class)->api_token,
-            };
-        } catch (Throwable) {
-            $scopeToken = null;
-        }
-
-        $scopeToken = is_string($scopeToken) ? trim($scopeToken) : '';
-
-        if ($scopeToken === '') {
-            $fallback = config('brain.tokens.'.$scope);
-            $scopeToken = is_string($fallback) ? trim($fallback) : '';
-        }
-
-        if ($scopeToken !== '') {
-            $tokens[] = $scopeToken;
-        }
-
-        return array_values(array_unique($tokens));
+        return in_array($token, (array) config('brain.tokens.defaults', []), true);
     }
 
     /**
-     * @param  list<string>  $expected
+     * Tokens committed to the repository are meant for `localhost` only. Any
+     * other caller must authenticate with a value that is not in the sources.
      */
-    private function matches(array $expected, string $provided): bool
+    private function defaultsAllowed(Request $request): bool
     {
-        foreach ($expected as $token) {
-            if (hash_equals($token, $provided)) {
-                return true;
-            }
+        return app()->environment(['local', 'testing'])
+            && in_array($request->ip(), ['127.0.0.1', '::1'], true);
+    }
+
+    /**
+     * Настройка первична: её пишет админка и `brain:token --generate`.
+     * Пустая настройка означает, что установка живёт на BRAIN_TOKEN.
+     */
+    private function expectedToken(): string
+    {
+        try {
+            app(SettingsInitializer::class)->ensure();
+            $stored = trim((string) app(SecuritySettings::class)->access_token);
+        } catch (Throwable) {
+            $stored = '';
         }
 
-        return false;
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return trim((string) config('brain.tokens.all', ''));
+    }
+
+    private function matches(string $expected, string $provided): bool
+    {
+        return $expected !== '' && hash_equals($expected, $provided);
     }
 
     private function unauthorized(Request $request, string $scope): Response

@@ -52,7 +52,7 @@ class ProxyTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'X-Neiro-Upstream' => 'deepseek',
             'Authorization' => 'Bearer sk-from-harness',
         ])->postJson('/v1/chat/completions', [
@@ -102,7 +102,7 @@ class ProxyTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'X-Neiro-Upstream' => 'deepseek',
             'Authorization' => 'Bearer sk-from-harness',
             'X-Neiro-Session' => 'harness-key',
@@ -148,7 +148,7 @@ class ProxyTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'settings-passthrough',
         ])->postJson('/v1/chat/completions', [
             'model' => 'harness-model',
@@ -176,7 +176,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'test-session',
             'X-Neiro-Harness' => 'test',
         ])->postJson('/v1/chat/completions', [
@@ -203,7 +203,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'stream-session',
         ])->postJson('/v1/chat/completions', [
             'model' => 'gpt-test',
@@ -226,7 +226,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'responses-session',
         ])->postJson('/v1/responses', [
             'model' => 'gpt-test',
@@ -245,7 +245,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'responses-stream',
         ])->postJson('/v1/responses', [
             'model' => 'gpt-test',
@@ -263,7 +263,7 @@ class ProxyTest extends TestCase
     public function test_anthropic_count_tokens_passthrough(): void
     {
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
         ])->postJson('/v1/messages/count_tokens', [
             'model' => 'claude-test',
             'messages' => [['role' => 'user', 'content' => 'Привет']],
@@ -278,7 +278,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Session' => 'anthropic-session',
         ])->postJson('/v1/messages', [
             'model' => 'claude-test',
@@ -309,7 +309,7 @@ class ProxyTest extends TestCase
         ]);
 
         $this->withHeaders(['x-api-key' => 'sk-harness-key'])
-            ->postJson('/dev-proxy-token/v1/messages', [
+            ->postJson('/dev-brain-token/v1/messages', [
                 'model' => 'deepseek-flash',
                 'max_tokens' => 8,
                 'messages' => [['role' => 'user', 'content' => 'ping']],
@@ -335,7 +335,7 @@ class ProxyTest extends TestCase
         ]);
 
         $this->withHeaders([
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'x-api-key' => 'sk-harness-key',
         ])
             ->postJson('/v1/messages', [
@@ -354,7 +354,7 @@ class ProxyTest extends TestCase
 
     public function test_token_in_the_path_authorizes_the_proxy(): void
     {
-        $this->getJson('/dev-proxy-token/v1/models')->assertOk();
+        $this->getJson('/dev-brain-token/v1/models')->assertOk();
         $this->getJson('/not-a-token/v1/models')->assertUnauthorized();
         $this->getJson('/v1/models')->assertUnauthorized();
     }
@@ -372,7 +372,7 @@ class ProxyTest extends TestCase
         $this->seedKnowledge();
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer dev-proxy-token',
+            'Authorization' => 'Bearer dev-brain-token',
             'X-Neiro-Memory' => 'off',
             'X-Neiro-Session' => 'no-memory',
         ])->postJson('/v1/chat/completions', [
@@ -402,7 +402,7 @@ class ProxyTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'X-Neiro-Upstream' => 'deepseek',
             'Authorization' => 'Bearer sk-from-harness',
         ])->postJson('/v1/chat/completions', [
@@ -449,7 +449,7 @@ class ProxyTest extends TestCase
         ]);
 
         $headers = [
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'X-Neiro-Upstream' => 'deepseek',
             'Authorization' => 'Bearer sk-from-harness',
         ];

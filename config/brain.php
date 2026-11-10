@@ -5,21 +5,23 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
-    | Fallback bearer tokens
+    | Bearer token
     |--------------------------------------------------------------------------
     |
-    | Tokens can be managed in the admin panel (they are stored encrypted).
-    | These values are used before the settings table exists and as a fallback.
+    | Один токен на все входы: прокси (/v1/*), MCP (/mcp/knowledge) и API
+    | (/api/v1/*) проверяют одно и то же значение. Хранится он в настройках
+    | группы security, а это значение — только начальное: им заполняется
+    | пустая настройка, после чего рулит админка (`brain:token --generate`).
     |
     */
     'tokens' => [
-        // Единый токен на все входы: прокси, MCP и API. Если задан, принимается
-        // в любом скоупе, поэтому отдельные BRAIN_*_TOKEN нужны только если
-        // хочется держать разные значения.
-        'all' => env('BRAIN_TOKEN'),
-        'proxy' => env('BRAIN_PROXY_TOKEN', 'dev-proxy-token'),
-        'mcp' => env('BRAIN_MCP_TOKEN', 'dev-mcp-token'),
-        'api' => env('BRAIN_API_TOKEN', 'dev-api-token'),
+        'all' => env('BRAIN_TOKEN', 'dev-brain-token'),
+
+        // Значение, которое лежит в этом репозитории открытым текстом. Годится
+        // только для localhost: если сервис слушает интернет, по нему сможет
+        // войти любой, кто прочитал исходники. VerifyBrainToken отбрасывает
+        // его для внешних запросов.
+        'defaults' => ['dev-brain-token'],
     ],
 
     'proxy' => [

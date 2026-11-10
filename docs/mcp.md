@@ -84,7 +84,7 @@ Local: `php artisan mcp:start knowledge`
     "neiro-brain": {
       "url": "http://neiro-brain.local/mcp/knowledge",
       "headers": {
-        "Authorization": "Bearer dev-mcp-token"
+        "Authorization": "Bearer dev-brain-token"
       }
     }
   }
@@ -95,7 +95,7 @@ Local: `php artisan mcp:start knowledge`
 
 ```bash
 claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowledge \
-  --header "Authorization: Bearer dev-mcp-token"
+  --header "Authorization: Bearer dev-brain-token"
 ```
 
 ### stdio
@@ -115,7 +115,7 @@ claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowled
 
 ```bash
 curl -X POST http://neiro-brain.local/mcp/knowledge \
-  -H "Authorization: Bearer dev-mcp-token" \
+  -H "Authorization: Bearer dev-brain-token" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{

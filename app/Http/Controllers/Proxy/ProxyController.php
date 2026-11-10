@@ -17,6 +17,7 @@ use App\Services\Proxy\MockUpstream;
 use App\Services\Proxy\ToolSchemaNormalizer;
 use App\Services\Proxy\UpstreamResolver;
 use App\Settings\ProxySettings;
+use App\Settings\SecuritySettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -870,9 +871,13 @@ class ProxyController extends Controller
 
     private function brainToken(): string
     {
-        $unified = trim((string) config('brain.tokens.all', ''));
+        try {
+            $stored = trim((string) app(SecuritySettings::class)->access_token);
+        } catch (\Throwable) {
+            $stored = '';
+        }
 
-        return $unified !== '' ? $unified : trim((string) $this->settings->access_token);
+        return $stored !== '' ? $stored : trim((string) config('brain.tokens.all', ''));
     }
 
     /**

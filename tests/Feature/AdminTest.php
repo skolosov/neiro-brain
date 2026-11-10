@@ -9,7 +9,6 @@ use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Services\Brain\SourceRegistry;
-use App\Settings\ProxySettings;
 use App\Settings\SecuritySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
@@ -95,13 +94,10 @@ class AdminTest extends TestCase
             ->post(route('brain.admin.tokens.generate'))
             ->assertRedirect();
 
-        $token = app(ProxySettings::class)->refresh()->access_token;
-        $security = app(SecuritySettings::class)->refresh();
+        $token = app(SecuritySettings::class)->refresh()->access_token;
 
-        $this->assertNotSame('dev-proxy-token', $token);
+        $this->assertNotSame('dev-brain-token', $token);
         $this->assertStringStartsWith('nb-', $token);
-        $this->assertSame($token, $security->mcp_token);
-        $this->assertSame($token, $security->api_token);
     }
 
     public function test_generated_token_authorizes_proxy_mcp_and_api(): void
@@ -109,7 +105,7 @@ class AdminTest extends TestCase
         $this->actingAs($this->admin(), 'moonshine')
             ->post(route('brain.admin.tokens.generate'));
 
-        $token = app(ProxySettings::class)->refresh()->access_token;
+        $token = app(SecuritySettings::class)->refresh()->access_token;
 
         $this->withHeaders(['X-Neiro-Proxy-Token' => $token])
             ->postJson('/v1/chat/completions', [
@@ -122,7 +118,7 @@ class AdminTest extends TestCase
             ->getJson('/api/v1/stats')
             ->assertOk();
 
-        $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-proxy-token'])
+        $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
             ->postJson('/v1/chat/completions', [
                 'model' => 'test',
                 'messages' => [['role' => 'user', 'content' => 'ping']],

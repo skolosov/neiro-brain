@@ -15,11 +15,13 @@ class SecuritySettings extends Settings
 
     public string $redaction = '[СКРЫТО]';
 
+    /**
+     * Единственный токен доступа: прокси, MCP и API проверяют его.
+     * Пустая строка означает «взять brain.tokens.all» — так установка
+     * подхватывает BRAIN_TOKEN, не требуя записи в базу.
+     */
     #[ShouldBeEncrypted]
-    public string $mcp_token = 'dev-mcp-token';
-
-    #[ShouldBeEncrypted]
-    public string $api_token = 'dev-api-token';
+    public string $access_token = '';
 
     /** @var list<string> */
     public array $custom_patterns = [];

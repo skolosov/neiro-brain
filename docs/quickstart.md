@@ -109,7 +109,7 @@ X-Neiro-Upstream: deepseek        # openai | deepseek | anthropic | openrouter |
 ```bash
 curl http://neiro-brain.local/v1/chat/completions \
   -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-  -H "X-Neiro-Proxy-Token: dev-proxy-token" \
+  -H "X-Neiro-Proxy-Token: dev-brain-token" \
   -H "X-Neiro-Upstream: deepseek" \
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"Какой у меня стек?"}]}'
@@ -125,7 +125,7 @@ curl http://neiro-brain.local/v1/chat/completions \
   "mcpServers": {
     "neiro-brain": {
       "url": "http://neiro-brain.local/mcp/knowledge",
-      "headers": { "Authorization": "Bearer dev-mcp-token" }
+      "headers": { "Authorization": "Bearer dev-brain-token" }
     }
   }
 }
@@ -135,7 +135,7 @@ Claude Code:
 
 ```bash
 claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowledge \
-  --header "Authorization: Bearer dev-mcp-token"
+  --header "Authorization: Bearer dev-brain-token"
 ```
 
 Инструменты: `search_knowledge`, `get_knowledge`, `remember_knowledge`,
@@ -156,7 +156,7 @@ claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowled
         apiKeyEnv: DEEPSEEK_API_KEY
         baseURL: http://127.0.0.1/v1
         headers:
-          X-Neiro-Proxy-Token: dev-proxy-token
+          X-Neiro-Proxy-Token: dev-brain-token
           X-Neiro-Upstream: deepseek
         models:
           - id: deepseek-flash
@@ -179,7 +179,7 @@ claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowled
         transport: streamable-http
         url: http://127.0.0.1/mcp/knowledge
         headers:
-          Authorization: Bearer dev-mcp-token
+          Authorization: Bearer dev-brain-token
 ```
 
 Затем в DSH: **Settings → Models → Neiro Brain (DeepSeek) → deepseek-flash**,

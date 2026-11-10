@@ -22,7 +22,7 @@ DeepSeek Harness
 
 Админка → **Настройки → Прокси для харнессов**: там есть только
 
-- Bearer-токен для харнесса (`dev-proxy-token`);
+- Bearer-токен для харнесса (`dev-brain-token`);
 - top K и лимит блока памяти;
 - переключатели памяти/захвата.
 
@@ -31,7 +31,7 @@ DeepSeek Harness
 | Заголовок | Значение |
 |---|---|
 | `Authorization` | `Bearer <DEEPSEEK_API_KEY>` — ключ провайдера |
-| `X-Neiro-Proxy-Token` | `dev-proxy-token` — доступ к Neiro Brain |
+| `X-Neiro-Proxy-Token` | `dev-brain-token` — доступ к Neiro Brain |
 | `X-Neiro-Upstream` | `deepseek` — какой upstream использовать |
 
 Проверка (ключ подставьте свой):
@@ -39,7 +39,7 @@ DeepSeek Harness
 ```bash
 curl http://127.0.0.1/v1/chat/completions \
   -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-  -H "X-Neiro-Proxy-Token: dev-proxy-token" \
+  -H "X-Neiro-Proxy-Token: dev-brain-token" \
   -H "X-Neiro-Upstream: deepseek" \
   -H "Content-Type: application/json" \
   -d '{"model":"deepseek-flash","reasoning_effort":"high","messages":[{"role":"user","content":"Какой у меня стек?"}]}'
@@ -64,7 +64,7 @@ curl http://127.0.0.1/v1/chat/completions \
         apiKeyEnv: DEEPSEEK_API_KEY
         baseURL: http://127.0.0.1/v1
         headers:
-          X-Neiro-Proxy-Token: dev-proxy-token
+          X-Neiro-Proxy-Token: dev-brain-token
           X-Neiro-Upstream: deepseek
         models:
           - id: deepseek-flash
@@ -116,7 +116,7 @@ Base URL и модели можно менять в UI, но **кастомны�
         transport: streamable-http
         url: http://127.0.0.1/mcp/knowledge
         headers:
-          Authorization: Bearer dev-mcp-token
+          Authorization: Bearer dev-brain-token
 ```
 
 После перезагрузки страницы DSH появляются инструменты:
@@ -131,13 +131,35 @@ Base URL и модели можно менять в UI, но **кастомны�
 
 > Найди в памяти, какой у меня стек и что мы решили по проекту Sklad.
 
-## 4. Токены
+## 4. Токен
 
-- `dev-proxy-token` — токен прокси из админки (Настройки → Прокси → Bearer-токен).
-- `dev-mcp-token` — токен MCP (Настройки → Безопасность).
+Токен один на все три входа: `X-Neiro-Proxy-Token` для `/v1/*`,
+`Authorization: Bearer` для `/mcp/knowledge` и `/api/v1/*`, и его же можно
+положить в адрес прокси (`http://host/<токен>/v1`).
 
-Если меняете токены в админке, обновите их в `cordis.patch.yml` и перезагрузите DSH.
-Токены в YAML лежат открыто — это локальный профиль; не коммитьте его в публичный репозиторий.
+`dev-brain-token` — значение из репозитория. Оно работает **только с localhost**:
+запрос с любого другого адреса по нему получает 401, иначе публичный сервер
+открывался бы по строке, которую знает любой читатель исходников.
+
+Свой токен:
+
+```powershell
+php artisan brain:token --generate   # создать nb-… и напечатать его
+php artisan brain:token             # показать текущий (замаскирован) и его источник
+php artisan brain:token --prune     # удалить поля старых токенов из settings
+```
+
+`--prune` откажется удалять, если действующий токен — значение из репозитория:
+в старых полях может лежать единственная копия рабочего токена. Сначала задайте
+настоящий токен, потом чистите.
+
+`BRAIN_TOKEN` в `.env` — начальное значение: им заполняется пустая настройка
+`security.access_token`. После `--generate` или сохранения формы в админке
+рулит настройка, а не `.env`.
+
+Скопируйте токен в `cordis.patch.yml` (заголовок MCP и адрес прокси) и
+перезагрузите DSH. Токены в YAML лежат открыто — это локальный профиль; не
+коммитьте его в публичный репозиторий.
 
 ## 5. Если не работает
 

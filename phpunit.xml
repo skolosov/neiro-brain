@@ -32,9 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="BRAIN_PROXY_TOKEN" value="dev-proxy-token"/>
-        <env name="BRAIN_MCP_TOKEN" value="dev-mcp-token"/>
-        <env name="BRAIN_API_TOKEN" value="dev-api-token"/>
+        <env name="BRAIN_TOKEN" value="dev-brain-token"/>
         <env name="BRAIN_PROXY_UPSTREAM" value="mock"/>
         <env name="SETTINGS_CACHE_ENABLED" value="false"/>
     </php>
