@@ -60,7 +60,7 @@ class VerifyBrainToken
             return $next($request);
         }
 
-        return $this->unauthorized($request, $scope);
+        return $this->unauthorized($request, $scope, $addressToken !== '');
     }
 
     private function looksLikeProviderKey(string $token): bool
@@ -108,14 +108,32 @@ class VerifyBrainToken
         return $expected !== '' && hash_equals($expected, $provided);
     }
 
-    private function unauthorized(Request $request, string $scope): Response
+    /**
+     * Токен в адресе — это часть пути: если он устарел, адреса не существует.
+     * Отвечаем 404, а не 401, чтобы харнесс показал текст, а не свою строку
+     * «Ключ API недействителен»: чинить нужно URL, а не ключ модели.
+     */
+    private function unauthorized(Request $request, string $scope, bool $addressToken = false): Response
     {
+        $hint = 'Действующий токен покажет команда php artisan brain:token.';
+
+        if ($addressToken) {
+            $message = 'Адрес прокси с этим токеном не найден: токен в адресе устарел. '
+                .'Скопируйте актуальный адрес прокси и замените префикс в базовом URL провайдера. '.$hint;
+
+            $payload = $request->is('v1/messages')
+                ? ['type' => 'error', 'error' => ['type' => 'invalid_request_error', 'message' => $message]]
+                : ['error' => ['type' => 'invalid_request_error', 'message' => $message]];
+
+            return response()->json($payload, 404);
+        }
+
         if ($scope === 'proxy' && $request->is('v1/messages')) {
             return response()->json([
                 'type' => 'error',
                 'error' => [
                     'type' => 'authentication_error',
-                    'message' => 'Invalid Neiro Brain proxy token.',
+                    'message' => 'Токен Neiro Brain не подошёл. '.$hint,
                 ],
             ], 401);
         }
@@ -124,7 +142,7 @@ class VerifyBrainToken
             'error' => [
                 'type' => 'authentication_error',
                 'code' => 'invalid_token',
-                'message' => 'Invalid Neiro Brain bearer token.',
+                'message' => 'Токен Neiro Brain не подошёл. '.$hint,
             ],
         ], 401);
     }

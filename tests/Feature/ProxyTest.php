@@ -355,7 +355,13 @@ class ProxyTest extends TestCase
     public function test_token_in_the_path_authorizes_the_proxy(): void
     {
         $this->getJson('/dev-brain-token/v1/models')->assertOk();
-        $this->getJson('/not-a-token/v1/models')->assertUnauthorized();
+
+        // Устаревший токен в адресе — это неверный адрес, а не неверный ключ:
+        // 404 заставляет харнесс показать текст, а не «Ключ API недействителен».
+        $this->getJson('/not-a-token/v1/models')
+            ->assertNotFound()
+            ->assertJsonPath('error.type', 'invalid_request_error');
+
         $this->getJson('/v1/models')->assertUnauthorized();
     }
 
