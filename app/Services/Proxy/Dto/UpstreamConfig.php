@@ -13,6 +13,7 @@ final readonly class UpstreamConfig
         public string $model,
         public int $timeout,
         public bool $mock,
+        public bool $keyFromRequest = false,
     ) {}
 
     public function isAnthropic(): bool

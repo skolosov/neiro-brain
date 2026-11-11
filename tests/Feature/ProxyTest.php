@@ -611,4 +611,142 @@ class ProxyTest extends TestCase
 
         Http::assertSent(fn (Request $request): bool => ($request['system'] ?? null) === '');
     }
+
+    /**
+     * 401 от upstream — это «прокси не смог представиться провайдеру», а не
+     * «клиент не авторизован». Ключ лежит в настройках, и сообщение должно
+     * отправлять человека туда, а не в настройки подключения модели.
+     */
+    public function test_upstream_auth_error_points_at_the_setting_to_fix(): void
+    {
+        $this->useUpstreamKey();
+
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'error' => [
+                    'message' => 'Authentication Fails, Your api key: ****10f5 is invalid',
+                    'type' => 'authentication_error',
+                ],
+            ], 401),
+        ]);
+
+        $response = $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
+            ->postJson('/v1/messages', [
+                'model' => 'deepseek-flash',
+                'max_tokens' => 8,
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ]);
+
+        $response->assertStatus(502)->assertHeader('X-Neiro-Upstream-Status', '401');
+
+        $message = (string) $response->json('error.message');
+        $this->assertStringContainsString('не принял ключ из настроек', $message);
+        $this->assertStringContainsString('Настройки', $message);
+        $this->assertStringContainsString('10f5', $message);
+    }
+
+    public function test_rejected_client_key_stays_a_client_error(): void
+    {
+        $this->useUpstreamKey();
+
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'error' => ['message' => 'Authentication Fails', 'type' => 'authentication_error'],
+            ], 401),
+        ]);
+
+        $response = $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
+            'Authorization' => 'Bearer sk-client-key',
+        ])->postJson('/v1/messages', [
+            'model' => 'deepseek-flash',
+            'max_tokens' => 8,
+            'messages' => [['role' => 'user', 'content' => 'ping']],
+        ]);
+
+        $response->assertStatus(401);
+        $this->assertStringContainsString('который прислал клиент', (string) $response->json('error.message'));
+    }
+
+    public function test_null_error_names_the_field_that_survived(): void
+    {
+        $this->useUpstreamKey();
+
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'error' => [
+                    'message' => 'Failed to deserialize the JSON body into the target type: messages[25].content: invalid type: null, expected a string at line 1 column 43602',
+                    'type' => 'invalid_request_error',
+                ],
+            ], 422),
+        ]);
+
+        $response = $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
+            ->postJson('/v1/messages', [
+                'model' => 'deepseek-flash',
+                'max_tokens' => 8,
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ]);
+
+        $response->assertStatus(422);
+
+        $message = (string) $response->json('error.message');
+        $this->assertStringContainsString('messages[25].content', $message);
+        $this->assertStringContainsString('laravel.log', $message);
+    }
+
+    public function test_unsupported_developer_role_is_explained(): void
+    {
+        $this->useUpstreamKey();
+
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'error' => [
+                    'message' => 'Failed to deserialize the JSON body into the target type: messages[0].role: unknown variant `developer`, expected one of `system`, `user`, `assistant`, `tool`',
+                    'type' => 'invalid_request_error',
+                ],
+            ], 422),
+        ]);
+
+        $response = $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
+            ->postJson('/v1/messages', [
+                'model' => 'deepseek-flash',
+                'max_tokens' => 8,
+                'messages' => [['role' => 'developer', 'content' => 'ping']],
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('supportsDeveloperRole', (string) $response->json('error.message'));
+    }
+
+    public function test_upstream_outage_becomes_a_readable_gateway_error(): void
+    {
+        $this->useUpstreamKey();
+
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response('upstream down', 503),
+        ]);
+
+        $response = $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
+            ->postJson('/v1/messages', [
+                'model' => 'deepseek-flash',
+                'max_tokens' => 8,
+                'messages' => [['role' => 'user', 'content' => 'ping']],
+            ]);
+
+        $response->assertStatus(502);
+        $this->assertStringContainsString('сбой на его стороне', (string) $response->json('error.message'));
+    }
+
+    /**
+     * Настройки, при которых ключ берётся из админки, а не из заголовка.
+     */
+    private function useUpstreamKey(): void
+    {
+        $settings = app(ProxySettings::class);
+        $settings->upstream = 'deepseek';
+        $settings->base_url = '';
+        $settings->api_key = 'sk-settings-key';
+        $settings->save();
+    }
 }

@@ -62,6 +62,7 @@ final class UpstreamResolver
         }
 
         $apiKey = trim((string) $requestedKey);
+        $keyFromRequest = $apiKey !== '';
 
         if ($apiKey === '') {
             $apiKey = trim($settings->api_key);
@@ -78,6 +79,7 @@ final class UpstreamResolver
             model: $requestedModel ?: $settings->model,
             timeout: $settings->timeout,
             mock: false,
+            keyFromRequest: $keyFromRequest,
         );
     }
 }

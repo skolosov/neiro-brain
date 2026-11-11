@@ -15,6 +15,7 @@ use App\Services\Brain\SourceRegistry;
 use App\Services\Proxy\Dto\UpstreamConfig;
 use App\Services\Proxy\MockUpstream;
 use App\Services\Proxy\ToolSchemaNormalizer;
+use App\Services\Proxy\UpstreamErrorTranslator;
 use App\Services\Proxy\UpstreamResolver;
 use App\Settings\ProxySettings;
 use App\Settings\SecuritySettings;
@@ -43,6 +44,7 @@ class ProxyController extends Controller
         private readonly SourceRegistry $sources,
         private readonly ConversationIngestor $ingestor,
         private readonly ToolSchemaNormalizer $toolSchemas,
+        private readonly UpstreamErrorTranslator $errors,
     ) {}
 
     public function chatCompletions(Request $request): Response
@@ -50,7 +52,7 @@ class ProxyController extends Controller
         $payload = $request->json()->all();
 
         if (! is_array($payload['messages'] ?? null) || $payload['messages'] === []) {
-            return $this->error('The "messages" field is required.', 422, 'openai');
+            return $this->error('В запросе нет поля messages или оно пустое — прокси нечего отправлять провайдеру.', 422, 'openai');
         }
 
         $upstream = $this->resolveUpstream($request, $payload, 'openai');
@@ -98,7 +100,7 @@ class ProxyController extends Controller
             ->post($upstream->url('chat/completions'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'openai');
         }
 
         $data = $response->json();
@@ -124,7 +126,7 @@ class ProxyController extends Controller
         $payload = $request->json()->all();
 
         if (! array_key_exists('input', $payload) && ! array_key_exists('messages', $payload)) {
-            return $this->error('The "input" field is required.', 422, 'openai');
+            return $this->error('В запросе нет поля input или оно пустое — прокси нечего отправлять провайдеру.', 422, 'openai');
         }
 
         $upstream = $this->resolveUpstream($request, $payload, 'openai');
@@ -184,7 +186,7 @@ class ProxyController extends Controller
             ->post($upstream->url('responses'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'openai');
         }
 
         $data = $response->json();
@@ -204,7 +206,7 @@ class ProxyController extends Controller
         $payload = $request->json()->all();
 
         if (! is_array($payload['messages'] ?? null) || $payload['messages'] === []) {
-            return $this->error('The "messages" field is required.', 422, 'anthropic');
+            return $this->error('В запросе нет поля messages или оно пустое — прокси нечего отправлять провайдеру.', 422, 'anthropic');
         }
 
         $upstream = $this->resolveUpstream($request, $payload, 'anthropic');
@@ -226,8 +228,8 @@ class ProxyController extends Controller
         $payload = $this->toolSchemas->normalizeAnthropic($payload);
         $payload['messages'] = $this->sanitizeMessageContents($payload['messages'], $normalized);
 
-        // Anthropic держит system prompt вне messages: пустой блок там ломает
-        // шлюз так же, как пустое сообщение.
+        // Anthropic РґРµСЂР¶РёС‚ system prompt РІРЅРµ messages: РїСѓСЃС‚РѕР№ Р±Р»РѕРє С‚Р°Рј Р»РѕРјР°РµС‚
+        // С€Р»СЋР· С‚Р°Рє Р¶Рµ, РєР°Рє РїСѓСЃС‚РѕРµ СЃРѕРѕР±С‰РµРЅРёРµ.
         if (($payload['system'] ?? null) === null && array_key_exists('system', $payload)) {
             $payload['system'] = '';
             $normalized++;
@@ -263,7 +265,7 @@ class ProxyController extends Controller
             ->post($upstream->url('messages'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'anthropic');
         }
 
         $data = $response->json();
@@ -295,7 +297,7 @@ class ProxyController extends Controller
         }
 
         if ($upstream->baseUrl === '' || $upstream->apiKey === '') {
-            return $this->error('Upstream API is not configured.', 503, 'anthropic');
+            return $this->error('Провайдер не настроен: не заданы базовый URL или ключ API. Проверьте админку → Настройки → AI-провайдер.', 503, 'anthropic');
         }
 
         $response = Http::withHeaders($this->anthropicHeaders($request, $upstream))
@@ -370,7 +372,7 @@ class ProxyController extends Controller
             ->post($upstream->url('chat/completions'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'openai');
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -445,7 +447,7 @@ class ProxyController extends Controller
             ->post($upstream->url('messages'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'anthropic');
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -519,7 +521,7 @@ class ProxyController extends Controller
             ->post($upstream->url('responses'), $payload);
 
         if ($response->failed()) {
-            return $this->upstreamFailure($response, $headers);
+            return $this->upstreamFailure($response, $headers, $upstream, 'openai');
         }
 
         return response()->stream(function () use ($response, $conversation): void {
@@ -832,8 +834,8 @@ class ProxyController extends Controller
      * Normalizing them to empty strings keeps the proxy transparent.
      *
      * The walk is recursive on purpose: the same value hides at different
-     * depths in different protocols — messages[i].content, content[j].text,
-     * tool_result.content, input[i].content — and one missed level reaches a
+     * depths in different protocols вЂ” messages[i].content, content[j].text,
+     * tool_result.content, input[i].content вЂ” and one missed level reaches a
      * gateway that answers with a raw deserialization error instead of a
      * readable one. Only keys named content and text are touched; tool schemas
      * live under the separate `tools` key and are never traversed here.
@@ -866,26 +868,51 @@ class ProxyController extends Controller
     }
 
     /**
-     * Pass an upstream error through unchanged while leaving a trace that
-     * separates a client-side problem from an upstream rejection: the
-     * normalized counter shows how many null values this proxy repaired.
+     * Отказ upstream превращается в объяснение, по которому можно действовать.
+     * Сырое тело провайдера уходит в лог: в чате от него нет пользы, а нужную
+     * деталь переводчик оставляет в конце сообщения.
      *
      * @param  array<string, string>  $headers
      */
-    private function upstreamFailure(\Illuminate\Http\Client\Response $response, array $headers): Response
-    {
-        if ($response->status() >= 400 && $response->status() < 500) {
-            Log::warning('Proxy upstream rejected the request.', [
-                'upstream' => (string) $response->effectiveUri(),
-                'status' => $response->status(),
-                'normalized' => (string) ($headers['X-Neiro-Normalized'] ?? '0'),
-                'body' => mb_substr((string) $response->body(), 0, 300),
-            ]);
-        }
+    private function upstreamFailure(
+        \Illuminate\Http\Client\Response $response,
+        array $headers,
+        UpstreamConfig $upstream,
+        string $protocol,
+    ): Response {
+        $status = $response->status();
+        $body = (string) $response->body();
+        $normalized = (int) ($headers['X-Neiro-Normalized'] ?? 0);
 
-        return response($response->body(), $response->status(), [
-            'Content-Type' => $response->header('Content-Type') ?: 'application/json',
+        $translated = $this->errors->translate($status, $body, $upstream, $normalized);
+
+        Log::warning('Proxy upstream rejected the request.', [
+            'upstream' => (string) $response->effectiveUri(),
+            'status' => $status,
+            'normalized' => (string) $normalized,
+            'key_from_request' => $upstream->keyFromRequest,
+            'body' => mb_substr($body, 0, 500),
+        ]);
+
+        $payload = $protocol === 'anthropic'
+            ? [
+                'type' => 'error',
+                'error' => [
+                    'type' => $translated['type'],
+                    'message' => $translated['message'],
+                ],
+            ]
+            : [
+                'error' => [
+                    'message' => $translated['message'],
+                    'type' => $translated['type'],
+                    'code' => $translated['type'],
+                ],
+            ];
+
+        return response()->json($payload, $translated['status'], [
             ...$headers,
+            'X-Neiro-Upstream-Status' => (string) $status,
         ]);
     }
 
@@ -929,11 +956,19 @@ class ProxyController extends Controller
         }
 
         if ($upstream->baseUrl === '') {
-            return $this->error('Upstream base URL is not configured.', 503, $format);
+            return $this->error(
+                'Провайдер не настроен: не задан базовый URL. Откройте админку → Настройки → AI-провайдер и заполните «Базовый URL».',
+                503,
+                $format,
+            );
         }
 
         if ($upstream->apiKey === '' && $upstream->driver !== 'ollama') {
-            return $this->error('Upstream API key is not configured.', 503, $format);
+            return $this->error(
+                'Провайдер не настроен: не задан ключ API. Откройте админку → Настройки → AI-провайдер → «Ключ API» или пришлите свой ключ в заголовке Authorization.',
+                503,
+                $format,
+            );
         }
 
         return null;
@@ -951,8 +986,8 @@ class ProxyController extends Controller
         return response()->json([
             'error' => [
                 'message' => $message,
-                'type' => 'neiro_proxy_error',
-                'code' => 'upstream_unavailable',
+                'type' => 'proxy_error',
+                'code' => 'proxy_error',
             ],
         ], $status);
     }
