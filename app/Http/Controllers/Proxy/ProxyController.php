@@ -226,6 +226,17 @@ class ProxyController extends Controller
         $payload = $this->toolSchemas->normalizeAnthropic($payload);
         $payload['messages'] = $this->sanitizeMessageContents($payload['messages'], $normalized);
 
+        // Anthropic держит system prompt вне messages: пустой блок там ломает
+        // шлюз так же, как пустое сообщение.
+        if (($payload['system'] ?? null) === null && array_key_exists('system', $payload)) {
+            $payload['system'] = '';
+            $normalized++;
+        } elseif (is_array($payload['system'] ?? null)) {
+            $systemNormalized = 0;
+            $payload['system'] = $this->sanitizeMessageContents($payload['system'], $systemNormalized);
+            $normalized += $systemNormalized;
+        }
+
         $headers = [
             'X-Neiro-Memory-Hits' => (string) count($hits),
             'X-Neiro-Normalized' => (string) $normalized,

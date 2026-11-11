@@ -524,7 +524,7 @@ class ProxyTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'X-Neiro-Proxy-Token' => 'dev-proxy-token',
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
             'X-Neiro-Upstream' => 'deepseek',
             'Authorization' => 'Bearer sk-from-harness',
         ])->postJson('/v1/chat/completions', [
@@ -538,5 +538,77 @@ class ProxyTest extends TestCase
 
         $response->assertOk();
         $this->assertSame('2', $response->headers->get('X-Neiro-Normalized'));
+    }
+
+    /**
+     * Пустая строка — это данные клиента, а не пустое поле формы.
+     * ConvertEmptyStringsToNull превращал её в null ещё до контроллера, и
+     * шлюз отвечал «invalid type: null, expected a string».
+     */
+    public function test_empty_strings_reach_upstream_untouched(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/anthropic/v1/messages' => Http::response([
+                'id' => 'msg_test',
+                'type' => 'message',
+                'role' => 'assistant',
+                'model' => 'deepseek-flash',
+                'content' => [['type' => 'text', 'text' => 'ok']],
+                'stop_reason' => 'end_turn',
+                'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+            ]),
+        ]);
+
+        $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+        ])->postJson('/v1/messages', [
+            'model' => 'deepseek-flash',
+            'max_tokens' => 8,
+            'system' => [['type' => 'text', 'text' => '']],
+            'messages' => [
+                ['role' => 'user', 'content' => 'ping'],
+                ['role' => 'assistant', 'content' => ''],
+                ['role' => 'user', 'content' => '  с отступами  '],
+            ],
+        ])->assertOk()->assertHeader('X-Neiro-Normalized', '0');
+
+        Http::assertSent(function (Request $request): bool {
+            $messages = $request['messages'];
+
+            return ($messages[1]['content'] ?? null) === ''
+                && ($messages[2]['content'] ?? null) === '  с отступами  '
+                && ($request['system'][0]['text'] ?? null) === '';
+        });
+    }
+
+    public function test_null_system_prompt_is_normalized_for_the_anthropic_endpoint(): void
+    {
+        Http::fake([
+            'https://api.deepseek.com/anthropic/v1/messages' => Http::response([
+                'id' => 'msg_test',
+                'type' => 'message',
+                'role' => 'assistant',
+                'model' => 'deepseek-flash',
+                'content' => [['type' => 'text', 'text' => 'ok']],
+                'stop_reason' => 'end_turn',
+                'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+            ]),
+        ]);
+
+        $this->withHeaders([
+            'X-Neiro-Proxy-Token' => 'dev-brain-token',
+            'X-Neiro-Upstream' => 'deepseek',
+            'Authorization' => 'Bearer sk-from-harness',
+            'X-Neiro-Memory' => 'off',
+        ])->postJson('/v1/messages', [
+            'model' => 'deepseek-flash',
+            'max_tokens' => 8,
+            'system' => null,
+            'messages' => [['role' => 'user', 'content' => 'ping']],
+        ])->assertOk()->assertHeader('X-Neiro-Normalized', '1');
+
+        Http::assertSent(fn (Request $request): bool => ($request['system'] ?? null) === '');
     }
 }

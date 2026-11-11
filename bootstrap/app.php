@@ -22,6 +22,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'brain.token' => VerifyBrainToken::class,
         ]);
+
+        // Прокси обязан передавать тело байт в байт: это чужая переписка, а не
+        // поля формы. Глобальные преобразования Laravel ломают её — пустая
+        // строка превращается в null, а пробелы по краям срезаются, после чего
+        // строгий шлюз отвечает «invalid type: null, expected a string».
+        $isProxy = static fn (Request $request): bool => $request->is('v1/*')
+            || ($request->is('*/v1/*') && ! $request->is('api/*'));
+
+        $middleware->convertEmptyStringsToNull([$isProxy]);
+        $middleware->trimStrings([$isProxy]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
