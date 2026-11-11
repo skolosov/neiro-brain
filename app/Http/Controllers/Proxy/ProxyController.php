@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * Transparent OpenAI- and Anthropic-compatible proxy.
@@ -366,9 +367,12 @@ class ProxyController extends Controller
             }, 200, $streamHeaders);
         }
 
+        // Поток живёт дольше обычного запроса: общий таймаут Guzzle считает
+        // время всей передачи, и 120 секунд обрывали длинные ответы. Обрыв по
+        // молчанию ловит relayStream, а не таймаут транспорта.
         $response = Http::withHeaders($this->openAiHeaders($upstream))
-            ->withOptions(['stream' => true, 'http_errors' => false])
-            ->timeout($upstream->timeout)
+            ->withOptions(['stream' => true, 'http_errors' => false, 'connect_timeout' => 15])
+            ->timeout(0)
             ->post($upstream->url('chat/completions'), $payload);
 
         if ($response->failed()) {
@@ -377,38 +381,15 @@ class ProxyController extends Controller
 
         return response()->stream(function () use ($response, $conversation): void {
             ignore_user_abort(true);
-            $body = $response->toPsrResponse()->getBody();
-            $buffer = '';
-            $text = '';
 
-            try {
-                while (! $body->eof()) {
-                    $chunk = $body->read(8192);
-
-                    if ($chunk === '') {
-                        usleep(5000);
-
-                        continue;
-                    }
-
-                    echo $chunk;
-                    @ob_flush();
-                    flush();
-                    $buffer .= $chunk;
-
-                    while (($position = strpos($buffer, "\n\n")) !== false) {
-                        $event = substr($buffer, 0, $position);
-                        $buffer = substr($buffer, $position + 2);
-                        $text .= $this->textFromOpenAiEvent($event);
-                    }
-                }
-
-                if (trim($buffer) !== '') {
-                    $text .= $this->textFromOpenAiEvent($buffer);
-                }
-            } finally {
-                $this->recordAssistant($conversation, $text, ['stream' => true]);
-            }
+            $this->relayStream(
+                $response,
+                $conversation,
+                fn (string $event): string => $this->textFromOpenAiEvent($event),
+                function (string $message): void {
+                    $this->emitOpenAiStreamError($message);
+                },
+            );
         }, $response->status(), $streamHeaders);
     }
 
@@ -442,8 +423,8 @@ class ProxyController extends Controller
         }
 
         $response = Http::withHeaders($this->anthropicHeaders($request, $upstream))
-            ->withOptions(['stream' => true, 'http_errors' => false])
-            ->timeout($upstream->timeout)
+            ->withOptions(['stream' => true, 'http_errors' => false, 'connect_timeout' => 15])
+            ->timeout(0)
             ->post($upstream->url('messages'), $payload);
 
         if ($response->failed()) {
@@ -452,38 +433,15 @@ class ProxyController extends Controller
 
         return response()->stream(function () use ($response, $conversation): void {
             ignore_user_abort(true);
-            $body = $response->toPsrResponse()->getBody();
-            $buffer = '';
-            $text = '';
 
-            try {
-                while (! $body->eof()) {
-                    $chunk = $body->read(8192);
-
-                    if ($chunk === '') {
-                        usleep(5000);
-
-                        continue;
-                    }
-
-                    echo $chunk;
-                    @ob_flush();
-                    flush();
-                    $buffer .= $chunk;
-
-                    while (($position = strpos($buffer, "\n\n")) !== false) {
-                        $event = substr($buffer, 0, $position);
-                        $buffer = substr($buffer, $position + 2);
-                        $text .= $this->textFromAnthropicEvent($event);
-                    }
-                }
-
-                if (trim($buffer) !== '') {
-                    $text .= $this->textFromAnthropicEvent($buffer);
-                }
-            } finally {
-                $this->recordAssistant($conversation, $text, ['stream' => true]);
-            }
+            $this->relayStream(
+                $response,
+                $conversation,
+                fn (string $event): string => $this->textFromAnthropicEvent($event),
+                function (string $message): void {
+                    $this->emitAnthropicStreamError($message);
+                },
+            );
         }, $response->status(), $streamHeaders);
     }
 
@@ -516,8 +474,8 @@ class ProxyController extends Controller
         }
 
         $response = Http::withHeaders($this->openAiHeaders($upstream))
-            ->withOptions(['stream' => true, 'http_errors' => false])
-            ->timeout($upstream->timeout)
+            ->withOptions(['stream' => true, 'http_errors' => false, 'connect_timeout' => 15])
+            ->timeout(0)
             ->post($upstream->url('responses'), $payload);
 
         if ($response->failed()) {
@@ -526,39 +484,86 @@ class ProxyController extends Controller
 
         return response()->stream(function () use ($response, $conversation): void {
             ignore_user_abort(true);
-            $body = $response->toPsrResponse()->getBody();
-            $buffer = '';
-            $text = '';
 
-            try {
-                while (! $body->eof()) {
-                    $chunk = $body->read(8192);
-
-                    if ($chunk === '') {
-                        usleep(5000);
-
-                        continue;
-                    }
-
-                    echo $chunk;
-                    @ob_flush();
-                    flush();
-                    $buffer .= $chunk;
-
-                    while (($position = strpos($buffer, "\n\n")) !== false) {
-                        $event = substr($buffer, 0, $position);
-                        $buffer = substr($buffer, $position + 2);
-                        $text .= $this->textFromResponsesEvent($event);
-                    }
-                }
-
-                if (trim($buffer) !== '') {
-                    $text .= $this->textFromResponsesEvent($buffer);
-                }
-            } finally {
-                $this->recordAssistant($conversation, $text, ['stream' => true]);
-            }
+            $this->relayStream(
+                $response,
+                $conversation,
+                fn (string $event): string => $this->textFromResponsesEvent($event),
+                function (string $message): void {
+                    $this->emitResponsesStreamError($message);
+                },
+            );
         }, $response->status(), $streamHeaders);
+    }
+
+    /**
+     * Переливает SSE upstream клиенту и закрывает поток без исключений.
+     *
+     * Заголовки уже отправлены, когда этот код работает, поэтому любое
+     * вылетевшее исключение превращалось в «Cannot modify header information»
+     * и в непонятную ошибку хода. Обрыв у провайдера и его молчание теперь
+     * сообщаются событием ошибки внутри самого потока.
+     *
+     * @param  callable(string): string  $extractText
+     * @param  callable(string): void  $emitError
+     */
+    private function relayStream(
+        \Illuminate\Http\Client\Response $response,
+        ?Conversation $conversation,
+        callable $extractText,
+        callable $emitError,
+    ): void {
+        $buffer = '';
+        $text = '';
+        $silence = 0;
+
+        try {
+            $body = $response->toPsrResponse()->getBody();
+
+            while (! $body->eof()) {
+                if (connection_aborted() === 1) {
+                    break;
+                }
+
+                $chunk = $body->read(8192);
+
+                if ($chunk === '') {
+                    // 2400 * 5 мс ≈ 120 секунд тишины upstream.
+                    if (++$silence > 2400) {
+                        $emitError('Провайдер перестал присылать данные: ответа нет 120 секунд. Повторите запрос.');
+                        break;
+                    }
+
+                    usleep(5000);
+
+                    continue;
+                }
+
+                $silence = 0;
+                echo $chunk;
+                @ob_flush();
+                flush();
+                $buffer .= $chunk;
+
+                while (($position = strpos($buffer, "\n\n")) !== false) {
+                    $event = substr($buffer, 0, $position);
+                    $buffer = substr($buffer, $position + 2);
+                    $text .= $extractText($event);
+                }
+            }
+
+            if (trim($buffer) !== '') {
+                $text .= $extractText($buffer);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Proxy stream interrupted.', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            $emitError('Соединение с провайдером оборвалось: '.$exception->getMessage());
+        } finally {
+            $this->recordAssistant($conversation, $text, ['stream' => true]);
+        }
     }
 
     /**
@@ -781,7 +786,7 @@ class ProxyController extends Controller
                     'usage' => $data['usage'] ?? null,
                 ]),
             ]]);
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             Log::warning('Neiro Brain: failed to store proxied assistant message.', [
                 'conversation_id' => $conversation->id,
                 'error' => $exception->getMessage(),
@@ -920,7 +925,7 @@ class ProxyController extends Controller
     {
         try {
             $stored = trim((string) app(SecuritySettings::class)->access_token);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $stored = '';
         }
 
@@ -1220,6 +1225,38 @@ class ProxyController extends Controller
     /**
      * @param  array<string, mixed>  $data
      */
+    /**
+     * Ошибка посреди потока: клиент уже читает SSE, поэтому сообщение едет
+     * событием, а не HTTP-статусом.
+     */
+    private function emitAnthropicStreamError(string $message): void
+    {
+        echo 'event: error'."\n".'data: '.json_encode([
+            'type' => 'error',
+            'error' => ['type' => 'api_error', 'message' => $message],
+        ], JSON_UNESCAPED_UNICODE)."\n\n";
+        @ob_flush();
+        flush();
+    }
+
+    private function emitOpenAiStreamError(string $message): void
+    {
+        $this->emitSse(['error' => ['message' => $message, 'type' => 'proxy_stream_error']]);
+        echo "data: [DONE]\n\n";
+        @ob_flush();
+        flush();
+    }
+
+    private function emitResponsesStreamError(string $message): void
+    {
+        echo 'event: error'."\n".'data: '.json_encode([
+            'type' => 'error',
+            'message' => $message,
+        ], JSON_UNESCAPED_UNICODE)."\n\n";
+        @ob_flush();
+        flush();
+    }
+
     private function emitSse(array $data): void
     {
         echo 'data: '.json_encode($data, JSON_UNESCAPED_UNICODE)."\n\n";
