@@ -28,6 +28,47 @@ class SettingsTest extends TestCase
         $this->assertTrue(app(AiSettings::class)->heuristic_fallback);
     }
 
+    public function test_initializer_adds_a_missing_property_next_to_legacy_rows(): void
+    {
+        DB::table('settings')->where('group', 'security')->where('name', 'access_token')->delete();
+
+        $now = now();
+
+        foreach (['api_token', 'mcp_token'] as $legacy) {
+            DB::table('settings')->insert([
+                'group' => 'security',
+                'name' => $legacy,
+                'locked' => false,
+                'payload' => json_encode('stale', JSON_THROW_ON_ERROR),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        app(SettingsInitializer::class)->ensure();
+
+        $this->assertDatabaseHas('settings', ['group' => 'security', 'name' => 'access_token']);
+
+        $security = app(SecuritySettings::class)->refresh();
+        $security->access_token = 'nb-regenerated-token';
+        $security->save();
+
+        $this->assertSame('nb-regenerated-token', app(SecuritySettings::class)->refresh()->access_token);
+    }
+
+    public function test_initializer_does_not_re_encrypt_existing_values(): void
+    {
+        $proxy = app(ProxySettings::class);
+        $proxy->api_key = 'sk-existing-secret';
+        $proxy->save();
+
+        DB::table('settings')->where('group', 'proxy')->where('name', 'top_k')->delete();
+
+        app(SettingsInitializer::class)->ensure();
+
+        $this->assertSame('sk-existing-secret', app(ProxySettings::class)->refresh()->api_key);
+    }
+
     public function test_secrets_are_encrypted_at_rest_and_decrypted_on_load(): void
     {
         $proxy = app(ProxySettings::class);

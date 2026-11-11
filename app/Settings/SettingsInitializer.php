@@ -7,12 +7,18 @@ namespace App\Settings;
 use Illuminate\Support\Facades\DB;
 use ReflectionClass;
 use Spatie\LaravelSettings\Settings;
+use Spatie\LaravelSettings\SettingsConfig;
+use Spatie\LaravelSettings\Support\Crypto;
 
 /**
  * spatie/laravel-settings only persists properties that exist in the settings
- * table. On a fresh install the table is empty, so the first save from the admin
- * panel would fail with MissingSettings. This initializer writes the declared
- * defaults once, preserving any values that already exist.
+ * table. A missing row is loaded from the property default, and such an object
+ * cannot be saved: the mapper throws MissingSettings instead of writing defaults.
+ * That happens on a fresh install (empty table) and on an upgraded one, where the
+ * table still holds rows of removed properties (security.api_token/mcp_token).
+ *
+ * This initializer adds rows for exactly the missing properties and leaves every
+ * stored payload untouched, so an existing encrypted value is never re-encrypted.
  */
 final class SettingsInitializer
 {
@@ -37,6 +43,45 @@ final class SettingsInitializer
      */
     private function ensureClass(string $settingsClass): void
     {
+        $defaults = $this->defaults($settingsClass);
+
+        $stored = DB::table('settings')
+            ->where('group', $settingsClass::group())
+            ->pluck('name')
+            ->all();
+
+        $missing = array_values(array_diff(array_keys($defaults), $stored));
+
+        if ($missing === []) {
+            return;
+        }
+
+        $config = new SettingsConfig($settingsClass);
+        $payloads = [];
+
+        foreach ($missing as $name) {
+            $payload = $defaults[$name];
+
+            if ($cast = $config->getCast($name)) {
+                $payload = $cast->set($payload);
+            }
+
+            if ($config->isEncrypted($name)) {
+                $payload = Crypto::encrypt($payload);
+            }
+
+            $payloads[$name] = $payload;
+        }
+
+        $config->getRepository()->updatePropertiesPayload($settingsClass::group(), $payloads);
+    }
+
+    /**
+     * @param  class-string<Settings>  $settingsClass
+     * @return array<string, mixed>
+     */
+    private function defaults(string $settingsClass): array
+    {
         $reflection = new ReflectionClass($settingsClass);
         $defaults = [];
 
@@ -57,17 +102,6 @@ final class SettingsInitializer
             $defaults['access_token'] = (string) config('brain.tokens.all', $defaults['access_token']);
         }
 
-        $rows = DB::table('settings')->where('group', $settingsClass::group())->pluck('payload', 'name');
-        $stored = [];
-
-        foreach ($rows as $name => $payload) {
-            $stored[$name] = json_decode((string) $payload, true);
-        }
-
-        if (count($stored) >= count($defaults)) {
-            return;
-        }
-
-        $settingsClass::fake(array_merge($defaults, $stored))->save();
+        return $defaults;
     }
 }
