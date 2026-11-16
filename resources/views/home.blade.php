@@ -8,29 +8,31 @@
         :root { color-scheme: light dark; }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #0f0c1d; color: #f5f2ff; line-height: 1.55; }
-        .wrap { max-width: 980px; margin: 0 auto; padding: 64px 24px; }
+        .wrap { max-width: 1040px; margin: 0 auto; padding: 64px 24px; }
         .kicker { color: #c4b5fd; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
         h1 { font-size: clamp(38px, 6vw, 64px); line-height: 1.05; margin: 12px 0 18px; }
         h1 span { color: #a78bfa; }
-        p { color: #c9c3dd; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 36px; }
-        .card { border: 1px solid #332b52; background: #17122b; border-radius: 16px; padding: 20px; }
-        .card b { color: #ede9fe; }
-        .card p { margin: 8px 0 0; font-size: 14px; }
-        code { background: #241c40; padding: 2px 7px; border-radius: 6px; color: #ddd6fe; }
-        .card code { display: inline-block; margin-bottom: 4px; font-size: 13px; }
+        .lead { color: #c9c3dd; max-width: 76ch; margin: 0; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; margin-top: 36px; align-items: stretch; }
+        .card { display: flex; flex-direction: column; gap: 12px; border: 1px solid #332b52; background: #17122b; border-radius: 16px; padding: 22px; }
+        .card h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 16px; color: #ede9fe; font-weight: 650; }
+        .card h2 .step { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 8px; background: #2a2150; color: #c4b5fd; font-size: 13px; font-weight: 700; }
+        .card p { margin: 0; font-size: 14px; color: #c9c3dd; }
+        code { font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace; background: #241c40; color: #ddd6fe; border-radius: 6px; padding: 1px 6px; font-size: 12.5px; overflow-wrap: anywhere; }
+        pre { margin: 0; background: #1b1533; border: 1px solid #2e2650; border-radius: 10px; padding: 10px 12px; overflow-x: auto; }
+        pre code { background: none; padding: 0; font-size: 12.5px; white-space: pre; }
         .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
         a.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; background: #7c3aed; color: white; text-decoration: none; font-weight: 650; }
         a.btn.secondary { background: transparent; border: 1px solid #4c3f78; color: #ddd6fe; }
-        footer { margin-top: 56px; color: #8f86ab; font-size: 13px; }
-        footer a { color: #a78bfa; }
+        footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid #241c3d; color: #8f86ab; font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+        footer a { color: #a78bfa; text-decoration: none; }
     </style>
 </head>
 <body>
 <div class="wrap">
     <div class="kicker">MCP · BM25 · Laravel</div>
     <h1>Neiro Brain<br><span>второй мозг для LLM</span></h1>
-    <p>
+    <p class="lead">
         База знаний принимает факты через MCP и HTTP API, держит их карточками с владельцем
         и отдаёт моделям. Поиск работает на Okapi BM25 с русской и английской морфологией,
         поэтому векторный индекс не нужен, чтобы вспомнить ваш стек, проекты и решения.
@@ -38,22 +40,23 @@
     </p>
 
     <div class="grid">
-        <div class="card">
-            <b>1. Подключите MCP</b>
-            <p><code>{{ url('/mcp/knowledge') }}</code> отдаёт <code>search_knowledge</code>,
-            <code>get_knowledge</code>, <code>remember_many</code> и другие инструменты.
-            Нужен личный токен из кабинета.</p>
-        </div>
-        <div class="card">
-            <b>2. Поставьте скилл <code>/brain</code></b>
-            <p><code>php artisan brain:skill</code> кладёт протокол в харнесс: поиск перед ответом,
-            запись пачкой, <code>/brain help</code> и <code>/brain compact</code> для слияния дублей.</p>
-        </div>
-        <div class="card">
-            <b>3. Смотрите знания</b>
-            <p>Кабинет: поиск, карточки с историей версий, проекты и граф.
-            Админка MoonShine видит всех: люди, токены, карточки любого владельца.</p>
-        </div>
+        <section class="card">
+            <h2><span class="step">1</span> Подключите MCP</h2>
+            <pre><code>{{ url('/mcp/knowledge') }}</code></pre>
+            <p>Сервер отдаёт <code>search_knowledge</code>, <code>get_knowledge</code>,
+                <code>remember_many</code> и другие инструменты. Нужен личный токен из кабинета.</p>
+        </section>
+        <section class="card">
+            <h2><span class="step">2</span> Поставьте скилл</h2>
+            <pre><code>php artisan brain:skill</code></pre>
+            <p>Кладёт протокол в харнесс: поиск перед ответом, запись пачкой,
+                <code>/brain help</code> и <code>/brain compact</code> для слияния дублей.</p>
+        </section>
+        <section class="card">
+            <h2><span class="step">3</span> Смотрите знания</h2>
+            <p>Кабинет: поиск, карточки с историей версий, проекты и граф. Админка MoonShine видит
+                всех: люди, токены, карточки любого владельца.</p>
+        </section>
     </div>
 
     <div class="actions">
@@ -62,8 +65,8 @@
     </div>
 
     <footer>
-        Знания пишутся через MCP, HTTP API и админку. Секреты вырезаются до записи в базу.
-        Проверка живости — <a href="{{ url('/up') }}">/up</a>.
+        <span>Знания пишутся через MCP, HTTP API и админку. Секреты вырезаются до записи в базу.</span>
+        <a href="{{ url('/up') }}">Проверка живости</a>
     </footer>
 </div>
 </body>
