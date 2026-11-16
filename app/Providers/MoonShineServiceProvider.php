@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\MoonShine\Pages\ConnectPage;
 use App\MoonShine\Pages\GraphPage;
 use App\MoonShine\Pages\InstructionPage;
 use App\MoonShine\Pages\ProjectsPage;
@@ -39,6 +40,7 @@ class MoonShineServiceProvider extends ServiceProvider
                 GraphPage::class,
                 ProjectsPage::class,
                 SettingsPage::class,
+                ConnectPage::class,
                 InstructionPage::class,
             ]);
     }

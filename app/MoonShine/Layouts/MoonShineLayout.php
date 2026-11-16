@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Layouts;
 
+use App\MoonShine\Pages\ConnectPage;
 use App\MoonShine\Pages\GraphPage;
 use App\MoonShine\Pages\InstructionPage;
 use App\MoonShine\Pages\ProjectsPage;
@@ -66,6 +67,7 @@ final class MoonShineLayout extends AppLayout
             ], 'users'),
             MenuGroup::make('Доступ', [
                 MenuItem::make(ApiTokenResource::class, 'Токены', 'key'),
+                MenuItem::make(ConnectPage::class, 'Подключение', 'link'),
             ], 'key'),
         ];
     }

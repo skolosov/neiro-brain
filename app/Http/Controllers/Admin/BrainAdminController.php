@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\Auth\TokenIssuer;
 use App\Services\Brain\Indexer;
 use App\Services\Brain\SkillText;
 use App\Settings\RetrievalSettings;
@@ -31,6 +32,32 @@ class BrainAdminController extends Controller
         $count = $indexer->indexAll();
 
         return back()->with('brain_status', sprintf('Переиндексировано записей: %d.', $count));
+    }
+
+    /**
+     * Выпуск токена со страницы «Подключение».
+     *
+     * Доступен любому, у кого есть свой человек в базе: страница показывает
+     * готовый конфиг, поэтому токену не нужно проходить через переписку с агентом.
+     */
+    public function connect(Request $request): RedirectResponse
+    {
+        $owner = PanelAccess::owner();
+
+        $target = redirect()->route('moonshine.page', ['pageUri' => 'connect-page']);
+
+        if ($owner === null) {
+            return $target->with('brain_status', 'Учётная запись не связана с человеком — выпускать токен некуда.');
+        }
+
+        $name = trim((string) $request->input('name', ''));
+        $name = $name !== '' ? mb_substr($name, 0, 64) : 'Харнесс';
+
+        $result = app(TokenIssuer::class)->issue($owner, $name, ['read', 'write']);
+
+        return $target
+            ->with('connect_plain', $result['plain'])
+            ->with('connect_name', $result['token']->name);
     }
 
     public function updateSettings(Request $request): RedirectResponse
