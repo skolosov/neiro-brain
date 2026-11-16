@@ -16,6 +16,7 @@
 
         .steps { display: flex; flex-direction: column; gap: 14px; margin-top: 36px; }
         .step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 8px 32px; align-items: start; border: 1px solid #332b52; background: #17122b; border-radius: 16px; padding: 20px 22px; }
+        .step-stack { grid-template-columns: minmax(0, 1fr); }
         .step h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 16px; color: #ede9fe; font-weight: 650; }
         .step h2 .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: 0 0 24px; border-radius: 8px; background: #2a2150; color: #c4b5fd; font-size: 13px; font-weight: 700; }
         .step p { margin: 0; font-size: 14px; color: #c9c3dd; }
@@ -99,23 +100,27 @@
             </div>
         </section>
 
-        <section class="step">
+        <section class="step step-stack">
             <div>
                 <h2><span class="step-num">3</span> Работайте</h2>
                 <p>Панель MoonShine — единственный интерфейс: поиск, карточки с историей версий,
                     проекты, граф и свои токены. У каждого человека своя база: чужие карточки не
                     видны ни в поиске, ни по id. Администратор видит всех.</p>
-                <p>Необязательно, но удобно: скилл <code>/brain</code> даёт команды
-                    <code>/brain</code>, <code>/brain compact</code> и <code>/brain doctor</code>.
+                <p>Необязательно, но удобно: скилл <code>/brain</code> учит агента работать с базой.
                     Ставится одной строкой — <code>curl -fsSL {{ url('/skill/install.sh') }} | sh</code>,
                     на Windows <code>irm {{ url('/skill/install.ps1') }} | iex</code>.</p>
             </div>
             <div class="cmds">
                 <div>
                     <div class="cmd-label">Команды в харнессе (со скиллом)</div>
-                    <pre><code>/brain            — сохранить знания из сессии
-/brain compact    — слить дубли
-/brain doctor     — проверить подключение</code></pre>
+                    <pre><code>/brain                          — сохранить знания из сессии в базу
+/brain show                     — показать, что было бы сохранено
+/brain init                     — получить ссылку на подключение MCP
+/brain doctor                   — проверить подключение и токен
+/brain compact                  — слить дубли во всей базе
+/brain compact --project=&lt;имя&gt; — слить дубли только в проекте
+/brain compact --theme=&lt;тема&gt;  — слить дубли только в теме
+/brain help                     — эта справка, без обращения к базе</code></pre>
                 </div>
             </div>
         </section>
