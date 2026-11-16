@@ -18,6 +18,11 @@ class RulesSettings extends Settings
 
     public ?string $skill_note = null;
 
+    /**
+     * Редактируемый протокол агента. Пусто — сервер берёт `resources/brain/skill.md`.
+     */
+    public ?string $skill_text = null;
+
     public static function group(): string
     {
         return 'rules';

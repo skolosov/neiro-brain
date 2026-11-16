@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\File;
  * Публичная раздача скилла `/brain` и скриптов его установки.
  *
  * Авторизации нет намеренно: без этого первый шаг невыполним — человеку негде
- * взять токен, пока он не поставил скилл и не зашёл в кабинет. Секрета в файле
+ * взять токен, пока он не поставил скилл и не зашёл в админку. Секрета в файле
  * нет: это инструкция агенту, а не данные пользователя. Доступ к знаниям
  * по-прежнему закрыт личным токеном на `/mcp/knowledge`.
  */
@@ -35,7 +35,7 @@ Invoke-WebRequest -UseBasicParsing -Uri "$base/skill/brain" -OutFile $target
 Write-Host "Скилл установлен: $target"
 Write-Host ''
 Write-Host "Дальше два шага:"
-Write-Host "  1. Выпустите личный токен: $base/app/tokens"
+Write-Host "  1. Выпустите личный токен в админке ($base/admin), раздел «Токены»."
 Write-Host "  2. В харнессе наберите /brain init — он подключит MCP-сервер."
 PS1;
 
@@ -53,7 +53,7 @@ mkdir -p "$dir"
 curl -fsSL "$base/skill/brain" -o "$dir/SKILL.md"
 printf 'Скилл установлен: %s/SKILL.md\n\n' "$dir"
 printf 'Дальше два шага:\n'
-printf '  1. Выпустите личный токен: %s/app/tokens\n' "$base"
+printf '  1. Выпустите личный токен в админке (%s/admin), раздел «Токены».\n' "$base"
 printf '  2. В харнессе наберите /brain init — он подключит MCP-сервер.\n'
 SH;
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MoonShine\Layouts;
 
 use App\MoonShine\Pages\GraphPage;
+use App\MoonShine\Pages\InstructionPage;
 use App\MoonShine\Pages\ProjectsPage;
 use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
@@ -58,6 +59,7 @@ final class MoonShineLayout extends AppLayout
                 MenuItem::make(ProjectsPage::class, 'Проекты', 'folder'),
                 MenuItem::make(KnowledgeEntryResource::class, 'Знания', 'book-open'),
                 MenuItem::make(SettingsPage::class, 'Настройки', 'cog-6-tooth')->canSee($isAdmin),
+                MenuItem::make(InstructionPage::class, 'Инструкция', 'document-text')->canSee($isAdmin),
             ], 'book-open'),
             MenuGroup::make('Люди', [
                 MenuItem::make(UserResource::class, 'Люди', 'users')->canSee($isAdmin),

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\Brain\Indexer;
+use App\Services\Brain\SkillText;
 use App\Settings\RetrievalSettings;
 use App\Settings\RulesSettings;
 use App\Settings\SecuritySettings;
@@ -73,6 +74,40 @@ class BrainAdminController extends Controller
         $rules->save();
 
         return back()->with('brain_status', 'Настройки сохранены.');
+    }
+
+    /**
+     * Сохранить отредактированный протокол агента. Пустой текст — сброс к файлу.
+     */
+    public function updateInstruction(Request $request): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        app(SettingsInitializer::class)->ensure();
+
+        $validated = $request->validate([
+            'skill_text' => ['nullable', 'string', 'max:50000'],
+        ]);
+
+        $text = $this->textOrNull($validated['skill_text'] ?? null);
+
+        $rules = app(RulesSettings::class);
+        $rules->skill_text = $text;
+        $rules->save();
+
+        return back()->with('brain_status', $text === null
+            ? 'Текст инструкции пуст — вернули стандартный протокол из файла.'
+            : 'Инструкция сохранена.');
+    }
+
+    public function resetInstruction(): RedirectResponse
+    {
+        $this->ensureAdmin();
+
+        app(SettingsInitializer::class)->ensure();
+        app(SkillText::class)->reset();
+
+        return back()->with('brain_status', 'Инструкция сброшена к стандартному тексту из файла.');
     }
 
     private function textOrNull(mixed $value): ?string

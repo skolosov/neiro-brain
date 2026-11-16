@@ -8,7 +8,7 @@ use Laravel\Mcp\Facades\Mcp;
 | MCP servers
 |--------------------------------------------------------------------------
 |
-| Web server: POST /mcp/knowledge (personal token from /app/tokens).
+| Web server: POST /mcp/knowledge (personal token from the admin panel, Tokens section).
 | Локального stdio-сервера больше нет: он ходил мимо токена, то есть мимо
 | личности, и записывал знания случайному владельцу.
 |

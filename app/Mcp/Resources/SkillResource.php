@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
+use App\Services\Brain\SkillText;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -15,8 +16,10 @@ use Laravel\Mcp\Server\Resource;
 /**
  * Тело скилла `/brain`, которое харнесс читает вместо локальной копии.
  *
- * Файл читается на каждом запросе без кэша: правила меняются вместе с кодом,
- * и устаревшая копия в памяти учила бы агента старому поведению.
+ * Текст берётся через `SkillText`: админ может отредактировать его в панели,
+ * а файл `resources/brain/skill.md` остаётся значением по умолчанию и сбросом.
+ * Кэша нет: правила меняются вместе с настройкой, и устаревшая копия в памяти
+ * учила бы агента старому поведению.
  */
 #[Name('brain-skill')]
 #[Uri('knowledge://skill/brain')]
@@ -26,16 +29,10 @@ class SkillResource extends Resource
 {
     public function handle(Request $request): Response
     {
-        $path = resource_path('brain/skill.md');
+        $markdown = app(SkillText::class)->current();
 
-        if (! is_file($path)) {
-            return Response::error('Файл правил не найден: resources/brain/skill.md.');
-        }
-
-        $markdown = file_get_contents($path);
-
-        if ($markdown === false) {
-            return Response::error('Не удалось прочитать файл правил: resources/brain/skill.md.');
+        if (trim($markdown) === '') {
+            return Response::error('Текст правил пуст: настройка skill_text не задана, файл resources/brain/skill.md недоступен.');
         }
 
         return Response::text($markdown);

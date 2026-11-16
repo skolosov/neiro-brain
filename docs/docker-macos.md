@@ -16,7 +16,7 @@ PostgreSQL, MoonShine 4, Laravel MCP) и DSH 0.2.x. Docker-обвязка в р�
 4. `docker compose up -d --build`, затем `migrate`, `brain:user`.
 5. Поставить Node ≥ 24.9 и `@deepseek-ai/dsh`, запустить `dsh web`.
 6. В `~/.dsh/profiles/web/cordis.patch.yml` добавить MCP-сервер `neiro-brain`.
-7. Выпустить личный токен в кабинете и вставить его в конфиг MCP.
+7. Выпустить личный токен в админке и вставить его в конфиг MCP.
 
 Дальше — подробно, с проверками после каждого шага.
 
@@ -30,16 +30,15 @@ DSH на macOS (~/.dsh)                         Docker Desktop
 │ модель: провайдер DSH ────────┼─────►│ web (nginx :8080)                        │
 │   (напрямую, без Neiro Brain) │      │   └─► app (php-fpm):                     │
 │                               │      │        /mcp/knowledge — MCP-сервер знаний │
-│ MCP «neiro-brain»             │      │        /app         — кабинет             │
-│   127.0.0.1:8080/mcp/knowledge├─────►│        /admin       — MoonShine           │
-│                               │      │        /api/v1/*    — свой HTTP API       │
+│ MCP «neiro-brain»             │      │        /admin       — админка MoonShine   │
+│   127.0.0.1:8080/mcp/knowledge├─────►│        /api/v1/*    — свой HTTP API       │
 └───────────────────────────────┘      │                                          │
                                        │ db: postgres:16 + volume pgdata           │
                                        └──────────────────────────────────────────┘
 ```
 
 Один поток: агент ищет и записывает знания через MCP, человек читает их в
-кабинете. Знания пишутся только по запросу агента — расписания и фоновой
+админке. Знания пишутся только по запросу агента — расписания и фоновой
 суммаризации нет, ключей провайдеров в Neiro Brain нет.
 
 ### Что в Docker, а что нативно
@@ -431,8 +430,8 @@ MOONSHINE_TITLE="Neiro Brain"
 | `APP_PORT` | `8080` | порт на macOS; меняйте, если занят |
 | `LOG_CHANNEL` | `stderr` | логи в `docker compose logs`, без файлов |
 
-> **Важно.** Личные токены выпускаются в кабинете (`/app/tokens`), а не задаются
-> в `.env`. `BRAIN_DEV_TOKEN` — только обход для `localhost` при `APP_ENV=local`;
+> **Важно.** Личные токены выпускаются в админке (`/admin`), раздел «Токены», а не
+> задаются в `.env`. `BRAIN_DEV_TOKEN` — только обход для `localhost` при `APP_ENV=local`;
 > на публичном сервере он бесполезен.
 
 ---
@@ -487,9 +486,9 @@ docker compose logs --tail=50 app web
 
 ---
 
-## 7. Шаг 5. Кабинет и личный токен
+## 7. Шаг 5. Админка и личный токен
 
-1. Откройте `http://localhost:8080/app` и войдите email + паролем человека,
+1. Откройте `http://localhost:8080/admin` и войдите email + паролем человека,
    созданного `brain:user`.
 2. **Токены → Выпустить**: имя, способности `read` или `read + write`.
 3. Скопируйте `nb-…` — он показывается один раз; в базе лежит SHA-256.
@@ -618,8 +617,8 @@ curl -sS -X POST http://127.0.0.1:8080/mcp/knowledge \
       }}'
 ```
 
-Если ответ `401` — токен неверный, отозван или истёк: выпустите новый в
-`/app/tokens`. Токен из `.env` больше не используется.
+Если ответ `401` — токен неверный, отозван или истёк: выпустите новый в админке,
+раздел «Токены». Токен из `.env` больше не используется.
 
 ### Другие харнессы (опционально)
 
@@ -660,8 +659,7 @@ claude mcp add --transport http neiro-brain http://127.0.0.1:8080/mcp/knowledge 
 
    > Запомни: предпочитаю модульный монолит и PHPUnit для тестов.
 
-   Агент вызовет `remember_many`; карточка появится в кабинете (`/app/search`) и
-   в админке → **Знания**.
+   Агент вызовет `remember_many`; карточка появится в админке → **Знания**.
 
 3. **Проверка из консоли.**
 
@@ -673,7 +671,7 @@ claude mcp add --transport http neiro-brain http://127.0.0.1:8080/mcp/knowledge 
    `brain:stats` покажет карточки, чанки и термины индекса. Если карточек `0` —
    проверьте ответ MCP и `docker compose logs app`.
 
-Цикл: MCP → PostgreSQL → BM25 → MCP; человек читает те же карточки в кабинете.
+Цикл: MCP → PostgreSQL → BM25 → MCP; человек читает те же карточки в админке.
 
 ---
 
@@ -740,7 +738,7 @@ docker compose start app
 
 ### Смена токенов
 
-1. Кабинет → **Токены** → «Выпустить» (или «Отозвать» старый).
+1. Админка → **Токены** → «Выпустить» (или «Отозвать» старый).
 2. Обновить значение в `~/.dsh/profiles/web/cordis.patch.yml`.
 3. Перезапустить `dsh web`.
 
@@ -795,7 +793,7 @@ DSH видит только смонтированные каталоги, а н
 | `SQLSTATE[08006]` / `password authentication failed` | Пароль в `.env` не совпадает с тем, с которым создан том `pgdata`. Либо верните старый пароль, либо `docker compose down -v` (удалит базу) |
 | `No application encryption key has been specified` | Пустой `APP_KEY`: сгенерируйте и перезапустите |
 | `419 Page Expired` на логине | Сменился `APP_KEY` или остались старые cookies. Очистите cookies для `localhost:8080`, `docker compose exec app php artisan optimize:clear` |
-| `401 invalid_token` от MCP | Токен неверный, отозван или истёк: выпустите новый в `/app/tokens` |
+| `401 invalid_token` от MCP | Токен неверный, отозван или истёк: выпустите новый в админке, раздел «Токены» |
 | `403 insufficient_ability` | У токена только `read`, а MCP требует `write` |
 | `503 no_owner` | В базе нет активного пользователя: `brain:user …` |
 | `400 model not found` | Id модели не совпал с тем, что отдаёт провайдер. Проверьте `models[].id` в патче или выберите другую модель в UI |
@@ -819,9 +817,9 @@ DSH видит только смонтированные каталоги, а н
 - [ ] В `.env` заданы `APP_KEY`, `DB_*`, `APP_URL`, `APP_PORT`, `LOG_CHANNEL=stderr`
 - [ ] `docker compose up -d` — сервисы `app`, `web`, `db` в состоянии `running`
 - [ ] `php artisan migrate --force` выполнен
-- [ ] Человек создан `brain:user`, вход в `/app` работает; вход в `/admin` — если нужен
+- [ ] Человек создан `brain:user`, вход в `/admin` работает
 - [ ] `brain:stats --user=…` отвечает без ошибок
-- [ ] Личный токен выпущен в кабинете (`read + write`) и вставлен в конфиг MCP
+- [ ] Личный токен выпущен в админке (`read + write`) и вставлен в конфиг MCP
 - [ ] Node ≥ 24.9, `dsh --version` работает
 - [ ] `~/.dsh/profiles/web/cordis.patch.yml` содержит MCP-сервер `neiro-brain`
 - [ ] MCP-инструменты `mcp__neiro-brain__*` видны в сессии

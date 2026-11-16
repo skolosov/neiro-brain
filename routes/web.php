@@ -46,4 +46,6 @@ Route::prefix('admin/brain')
     ->group(function (): void {
         Route::post('/reindex', [BrainAdminController::class, 'reindex'])->name('reindex');
         Route::post('/settings', [BrainAdminController::class, 'updateSettings'])->name('settings');
+        Route::post('/instruction', [BrainAdminController::class, 'updateInstruction'])->name('instruction');
+        Route::post('/instruction/reset', [BrainAdminController::class, 'resetInstruction'])->name('instruction.reset');
     });
