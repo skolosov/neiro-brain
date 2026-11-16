@@ -1,6 +1,8 @@
 ---
 name: brain
 description: Работа с личной базой знаний neiro-brain — поиск, запись фактов, слияние дублей.
+argument-hint: "[compact --project=<имя> | --theme=<тема>]"
+disable-model-invocation: true
 ---
 
 # /brain
