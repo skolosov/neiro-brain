@@ -54,8 +54,7 @@
                 <h2><span class="step-num">1</span> Подключите MCP</h2>
                 <p>Сервер отдаёт <code>search_knowledge</code>, <code>get_knowledge</code>,
                     <code>remember_many</code> и другие инструменты. Нужен личный токен из панели.</p>
-                <p>Проще не прописывать конфиг руками: после установки скилла наберите
-                    <code>/brain init</code> — он спросит адрес и токен и подключит сервер сам.</p>
+                <p>Готовый конфиг — в шаге 2: скопируйте, подставьте токен, вставьте в харнесс.</p>
             </div>
             <div class="cmds">
                 <div>
@@ -67,37 +66,52 @@
 
         <section class="step">
             <div>
-                <h2><span class="step-num">2</span> Поставьте скилл</h2>
-                <p>Скрипт делает одно: кладёт файл в <code>~/.agents/skills/brain</code>.
-                    Дальше в харнессе — <code>/brain init</code>, перезапуск и <code>/brain doctor</code>.</p>
+                <h2><span class="step-num">2</span> Вставьте конфиг в харнесс</h2>
+                <p>Скопируйте блок и положите в конфиг своего клиента (Claude Code, Cursor, DSH —
+                    у каждого свой файл). Замените <code>nb-…</code> на личный токен из раздела
+                    «Токены» в админке: он показывается один раз.</p>
+                <p>Адрес уже правильный — он собран из <code>APP_URL</code>, поэтому работает и по
+                    внешнему адресу, и по локальному.</p>
             </div>
             <div class="cmds">
                 <div>
-                    <div class="cmd-label">Windows</div>
-                    <pre><code>irm {{ url('/skill/install.ps1') }} | iex</code></pre>
-                </div>
-                <div>
-                    <div class="cmd-label">macOS и Linux</div>
-                    <pre><code>curl -fsSL {{ url('/skill/install.sh') }} | sh</code></pre>
+                    <div class="cmd-label">
+                        mcp.json
+                        <button type="button" id="nb-copy-mcp" class="btn" style="float:right;padding:0 8px;font-size:11px;line-height:1.6;background:#4c3f78;border:0;border-radius:6px;color:#ddd6fe;cursor:pointer" onclick="nbCopyMcp(this)">Скопировать</button>
+                    </div>
+                    <pre id="nb-mcp-json"><code>{
+  "mcpServers": {
+    "neiro-brain": {
+      "url": "{{ url('/mcp/knowledge') }}",
+      "headers": {
+        "Authorization": "Bearer nb-…"
+      },
+      "description": "Личная база знаний Neiro Brain: поиск карточек, чтение, запись новых знаний.",
+      "exposure": "direct"
+    }
+  }
+}</code></pre>
                 </div>
             </div>
         </section>
 
         <section class="step">
             <div>
-                <h2><span class="step-num">3</span> Смотрите знания</h2>
+                <h2><span class="step-num">3</span> Работайте</h2>
                 <p>Панель MoonShine — единственный интерфейс: поиск, карточки с историей версий,
                     проекты, граф и свои токены. У каждого человека своя база: чужие карточки не
                     видны ни в поиске, ни по id. Администратор видит всех.</p>
-                <p>Если что-то не работает — <code>/brain doctor</code>: он проверит скилл, конфиг,
-                    токен и протокол и скажет, что именно сломано.</p>
+                <p>Необязательно, но удобно: скилл <code>/brain</code> даёт команды
+                    <code>/brain</code>, <code>/brain compact</code> и <code>/brain doctor</code>.
+                    Ставится одной строкой — <code>curl -fsSL {{ url('/skill/install.sh') }} | sh</code>,
+                    на Windows <code>irm {{ url('/skill/install.ps1') }} | iex</code>.</p>
             </div>
             <div class="cmds">
                 <div>
-                    <div class="cmd-label">Команды в харнессе</div>
-                    <pre><code>/brain help
-/brain init
-/brain doctor</code></pre>
+                    <div class="cmd-label">Команды в харнессе (со скиллом)</div>
+                    <pre><code>/brain            — сохранить знания из сессии
+/brain compact    — слить дубли
+/brain doctor     — проверить подключение</code></pre>
                 </div>
             </div>
         </section>
@@ -112,5 +126,40 @@
         <a href="{{ url('/up') }}">Проверка живости</a>
     </footer>
 </div>
+
+<script>
+    function nbCopyMcp(button) {
+        var pre = document.getElementById('nb-mcp-json');
+        var text = pre.innerText || pre.textContent;
+        var restore = function () {
+            button.textContent = 'Скопировать';
+        };
+        var done = function () {
+            button.textContent = 'Скопировано';
+            window.setTimeout(restore, 2000);
+        };
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(done).catch(function () {
+                window.getSelection().selectAllChildren(pre);
+                done();
+            });
+            return;
+        }
+
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+
+        try {
+            document.execCommand('copy');
+            done();
+        } catch (error) {
+            button.textContent = 'Нажмите Ctrl+C';
+            window.setTimeout(restore, 3000);
+        }
+    }
+</script>
 </body>
 </html>
