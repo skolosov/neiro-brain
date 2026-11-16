@@ -262,7 +262,10 @@ class PanelRolesTest extends TestCase
             ->get($this->tokenIndexUrl())
             ->assertOk()
             ->assertSee('Ноутбук')
-            ->assertSee('второй раз мы его не покажем');
+            ->assertSee('второй раз мы его не покажем')
+            // Токен показывается один раз, но скопировать его должно быть чем.
+            ->assertSee('Скопировать')
+            ->assertSee('nb-copy-token');
 
         preg_match('/nb-[A-Za-z0-9]{40}/', (string) $response->getContent(), $matches);
 
