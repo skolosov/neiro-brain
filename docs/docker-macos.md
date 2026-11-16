@@ -1,8 +1,8 @@
 # Neiro Brain в Docker + DeepSeek Harness на macOS
 
 Пошаговая инструкция: поднять Neiro Brain на macOS в Docker, подключить к нему
-DeepSeek Harness, провести модель через прозрачный прокси и отдать агенту
-MCP-сервер знаний.
+DeepSeek Harness как MCP-клиент и отдать агенту базу знаний. Модель DSH
+настраивает сам: через Neiro Brain она больше не идёт.
 
 Инструкция написана под репозиторий `skolosov/neiro-brain` (Laravel 13, PHP 8.4,
 PostgreSQL, MoonShine 4, Laravel MCP) и DSH 0.2.x. Docker-обвязка в репозитории
@@ -13,10 +13,10 @@ PostgreSQL, MoonShine 4, Laravel MCP) и DSH 0.2.x. Docker-обвязка в р�
 1. `git clone` репозитория в `~/www/neiro-brain`.
 2. Создать `Dockerfile`, `docker-compose.yml`, `docker/*` и `.dockerignore` (раздел 4).
 3. В `.env`: `APP_KEY`, `DB_*`, `APP_URL=http://localhost:8080`, `LOG_CHANNEL=stderr`.
-4. `docker compose up -d --build`, затем `migrate`, `moonshine:user`, `brain:stats`.
+4. `docker compose up -d --build`, затем `migrate`, `brain:user`.
 5. Поставить Node ≥ 24.9 и `@deepseek-ai/dsh`, запустить `dsh web`.
-6. В `~/.dsh/profiles/web/cordis.patch.yml` добавить провайдера и MCP-сервер.
-7. В админке проверить токены и указать ключ для суммаризации.
+6. В `~/.dsh/profiles/web/cordis.patch.yml` добавить MCP-сервер `neiro-brain`.
+7. Выпустить личный токен в кабинете и вставить его в конфиг MCP.
 
 Дальше — подробно, с проверками после каждого шага.
 
@@ -27,36 +27,28 @@ PostgreSQL, MoonShine 4, Laravel MCP) и DSH 0.2.x. Docker-обвязка в р�
 ```
 DSH на macOS (~/.dsh)                         Docker Desktop
 ┌───────────────────────────────┐      ┌──────────────────────────────────────────┐
-│ модель «Neiro Brain»          │      │ web (nginx :8080)                        │
-│   baseURL 127.0.0.1:8080/v1   ├─────►│   └─► app (php-fpm):                      │
-│   заголовки X-Neiro-*         │      │        /v1/*        — прокси + память     │
+│ модель: провайдер DSH ────────┼─────►│ web (nginx :8080)                        │
+│   (напрямую, без Neiro Brain) │      │   └─► app (php-fpm):                     │
 │                               │      │        /mcp/knowledge — MCP-сервер знаний │
-│ MCP «neiro-brain»             │      │        /admin       — MoonShine           │
-│   127.0.0.1:8080/mcp/knowledge├─────►│        /api/v1/*    — свой API            │
+│ MCP «neiro-brain»             │      │        /app         — кабинет             │
+│   127.0.0.1:8080/mcp/knowledge├─────►│        /admin       — MoonShine           │
+│                               │      │        /api/v1/*    — свой HTTP API       │
 └───────────────────────────────┘      │                                          │
-                                       │ scheduler: brain:sync каждые 15 минут     │
                                        │ db: postgres:16 + volume pgdata           │
-                                       └───────────────────┬──────────────────────┘
-                                                           │ HTTPS
-                                                           ▼
-                                                   https://api.deepseek.com
+                                       └──────────────────────────────────────────┘
 ```
 
-Два независимых потока:
-
-1. **Чат** идёт из DSH в Neiro Brain (`/v1/chat/completions`), прокси подмешивает
-   память в system prompt, передаёт запрос в DeepSeek и записывает диалог в PostgreSQL.
-2. **Знания** возвращаются агенту через MCP (`/mcp/knowledge`) и подмешиваются в
-   промпт на каждом запросе. Раз в 15 минут `brain:sync` суммирует «тихие» диалоги
-   в карточки знаний.
+Один поток: агент ищет и записывает знания через MCP, человек читает их в
+кабинете. Знания пишутся только по запросу агента — расписания и фоновой
+суммаризации нет, ключей провайдеров в Neiro Brain нет.
 
 ### Что в Docker, а что нативно
 
 | Компонент | Где | Почему |
 |---|---|---|
-| Neiro Brain: nginx + php-fpm + PostgreSQL + планировщик | Docker | Ничего не требует от macOS, кроме порта 8080 |
+| Neiro Brain: nginx + php-fpm + PostgreSQL | Docker | Ничего не требует от macOS, кроме порта 8080 |
 | DeepSeek Harness | macOS, нативно (`dsh web`) | `dsh web` по умолчанию слушает только loopback и **отклоняет** `--host 0.0.0.0`; харнессу нужны ваши файлы, shell и ключи. Подробнее — раздел 13 |
-| DeepSeek API | облако | Ключ чата живёт в DSH; для суммаризации в админке хранится отдельный ключ |
+| Модель | DSH | Ключ провайдера живёт в DSH; в Neiro Brain его нет |
 
 ---
 
@@ -68,7 +60,7 @@ DSH на macOS (~/.dsh)                         Docker Desktop
 | Docker Desktop | 4.30+ | `docker --version`, `docker compose version` |
 | Ресурсы Docker | 4 GB RAM, 2 CPU | Docker Desktop → Settings → Resources |
 | Node.js | **≥ 24.9** (требование DSH 0.2.x) | `node -v` |
-| DeepSeek API-ключ | — | [platform.deepseek.com](https://platform.deepseek.com) |
+| Ключ модели | — | нужен только DSH для выбранного провайдера; Neiro Brain его не хранит |
 | Доступ к репозиторию | репозиторий приватный | `gh auth status` или SSH-ключ |
 | Свободные порты | 8080 (Neiro Brain), 3080 (DSH) | `lsof -nP -iTCP:8080 -sTCP:LISTEN` |
 
@@ -278,8 +270,6 @@ server {
         fastcgi_param DOCUMENT_ROOT   $realpath_root;
         fastcgi_param HTTP_PROXY      "";
 
-        # Прокси Neiro Brain отдаёт SSE — буферизация ломает стриминг.
-        fastcgi_buffering    off;
         fastcgi_read_timeout 600s;
         fastcgi_send_timeout 600s;
     }
@@ -290,8 +280,8 @@ server {
 }
 ```
 
-`fastcgi_buffering off` + заголовок `X-Accel-Buffering: no`, который прокси уже
-отдаёт, обеспечивают потоковый ответ модели.
+`fastcgi_read_timeout` с запасом: поиск и запись пачкой карточек могут быть
+небыстрыми, но стриминга здесь больше нет.
 
 ### 4.5. `docker-compose.yml`
 
@@ -311,18 +301,6 @@ services:
       dockerfile: Dockerfile
     image: neiro-brain/app:local
     restart: unless-stopped
-    volumes: *app-volumes
-    depends_on:
-      db:
-        condition: service_healthy
-
-  scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: neiro-brain/app:local
-    restart: unless-stopped
-    command: ["php", "artisan", "schedule:work"]
     volumes: *app-volumes
     depends_on:
       db:
@@ -375,8 +353,8 @@ volumes:
   появляется из сборки, а не с macOS.
 - **Права**: `storage` и `bootstrap/cache` принадлежат `www-data` внутри тома,
   поэтому FPM и CLI не спорят с macOS за владельца файлов.
-- **Планировщик** — отдельный контейнер `scheduler` с тем же образом:
-  `php artisan schedule:work` крутит `schedule:run` раз в минуту.
+- **Планировщика нет**: знания пишутся по запросу агента; отдельный контейнер
+  `scheduler` не нужен.
 - **`${DB_PASSWORD:?…}`** — compose упадёт с понятной ошибкой, если пароль не задан.
 
 ### 4.6. `.dockerignore`
@@ -437,10 +415,6 @@ DB_DATABASE=neiro_brain
 DB_USERNAME=neiro
 DB_PASSWORD=neiro-local-password
 
-# Прокси по умолчанию ходит в DeepSeek, а не в mock
-BRAIN_PROXY_UPSTREAM=deepseek
-BRAIN_TOKEN=dev-brain-token
-
 MOONSHINE_TITLE="Neiro Brain"
 ```
 
@@ -456,13 +430,10 @@ MOONSHINE_TITLE="Neiro Brain"
 | `APP_URL` | `http://localhost:8080` | по нему открывается админка |
 | `APP_PORT` | `8080` | порт на macOS; меняйте, если занят |
 | `LOG_CHANNEL` | `stderr` | логи в `docker compose logs`, без файлов |
-| `BRAIN_PROXY_UPSTREAM` | `deepseek` | fallback, если харнесс не прислал `X-Neiro-Upstream` |
-| `BRAIN_*_TOKEN` | `dev-*` | стартовые токены; дальше меняются в админке |
 
-> **Важно.** `BRAIN_*_TOKEN` и `BRAIN_PROXY_UPSTREAM` копируются в таблицу
-> `settings` при первом обращении (`SettingsInitializer`). После первого запуска
-> правка `.env` **не** меняет токены — менять только в админке. То же с
-> `BRAIN_PROXY_UPSTREAM`: после инициализации он живёт в настройках.
+> **Важно.** Личные токены выпускаются в кабинете (`/app/tokens`), а не задаются
+> в `.env`. `BRAIN_DEV_TOKEN` — только обход для `localhost` при `APP_ENV=local`;
+> на публичном сервере он бесполезен.
 
 ---
 
@@ -477,17 +448,19 @@ docker compose ps
 ```
 
 Первый запуск занимает 2–5 минут: собирается PHP-образ и инициализируется PostgreSQL.
-Миграции выполняются до старта `scheduler` — чтобы `brain:sync` не попал в
-несуществующие таблицы. Дальше — администратор:
+Дальше — человек и его токен:
 
 ```bash
-docker compose exec app php artisan moonshine:user \
-  --username=admin@neiro-brain.local \
-  --name=Admin \
+docker compose exec app php artisan brain:user \
+  --email=owner@example.com \
+  --name="Владелец" \
   --password='ЗаменитеЭтотПароль'
 
-docker compose exec app php artisan brain:stats
+docker compose exec app php artisan brain:stats --user=owner@example.com
 ```
+
+`moonshine:user` нужен только для доступа в админку MoonShine; его можно завести
+отдельно или через `brain:user --admin`.
 
 Проверки:
 
@@ -498,7 +471,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/up
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/admin
 # 302 (редирект на /admin/login)
 
-docker compose logs --tail=50 app web scheduler
+docker compose logs --tail=50 app web
 ```
 
 Админка: <http://localhost:8080/admin> — логин `admin@neiro-brain.local`.
@@ -514,52 +487,20 @@ docker compose logs --tail=50 app web scheduler
 
 ---
 
-## 7. Шаг 5. Админка: токены и суммаризация
+## 7. Шаг 5. Кабинет и личный токен
 
-Откройте **Настройки** (`/admin/page/settings-page`) и проверьте блоки.
+1. Откройте `http://localhost:8080/app` и войдите email + паролем человека,
+   созданного `brain:user`.
+2. **Токены → Выпустить**: имя, способности `read` или `read + write`.
+3. Скопируйте `nb-…` — он показывается один раз; в базе лежит SHA-256.
 
-### 7.1. Токен доступа
+`read` — поиск и чтение API. `write` нужен MCP (`remember_many`,
+`delete_knowledge`) и `POST /api/v1/entries`; `write` подразумевает `read`.
+Отзыв — там же, действует сразу. Токен передаётся только заголовком
+`Authorization: Bearer nb-…`; дев-токена и токена в адресе нет.
 
-Один токен на всё: прокси, MCP, API. Для локальной машины можно оставить `dev-*`;
-если генерируете новый — сразу копируйте в конфиг DSH (шаги 7–8) и перезапускайте
-харнесс. Токен из админки перекрывает значение из `.env`.
-
-### 7.2. Память и прокси
-
-- «Прокси включён» — включено;
-- «Подмешивать память» — включено;
-- «Записывать диалоги» — включено;
-- Top K и лимит блока памяти можно не трогать.
-
-### 7.3. Суммаризация
-
-Это **второй, независимый ключ** — он нужен только cron-задаче `brain:sync`,
-прокси его не использует.
-
-| Поле | Значение |
-|---|---|
-| Провайдер | DeepSeek |
-| Модель | `deepseek-flash` |
-| API-ключ | ключ DeepSeek (сохраняется зашифрованным `APP_KEY`) |
-| Base URL | пусто (по умолчанию `https://api.deepseek.com`) |
-| Temperature | `0.2` |
-| Max tokens | `4000` |
-
-Без ключа синхронизация работает в режиме эвристики: карточки почти не появляются.
-Ключ из DSH сюда не подставляется автоматически — это разные процессы.
-
-### 7.4. Синхронизация
-
-- «Тишина перед суммаризацией» — 10–15 минут;
-- «Хранить переписку, часов» — `24` (переписка нужна только для суммаризации);
-- «Cron включён» — включено.
-
-Планировщик уже работает в контейнере `scheduler`; проверка:
-
-```bash
-docker compose exec app php artisan schedule:list
-# */15 * * * *  php artisan brain:sync ... (каждые 15 минут)
-```
+Админка `/admin` (MoonShine) нужна для людей, токенов, всех карточек и правил
+записи. Провайдера и ключа модели в ней нет и не должно быть.
 
 ---
 
@@ -623,99 +564,15 @@ chmod 600 ~/.dsh/.env
 
 ---
 
-## 9. Шаг 7. Подключить модель
+## 9. Шаг 7. Модель в DSH
 
-Модель подключается в DSH, а не в админке Neiro Brain: харнесс отправляет свой
-ключ DeepSeek в `Authorization`, а Neiro Brain узнаёт себя по
-`X-Neiro-Proxy-Token` и выбирает апстрим по `X-Neiro-Upstream`.
+Модель к Neiro Brain отношения не имеет: выберите провайдера и модель в DSH
+обычным способом (**Settings → Models**) или своим блоком `llm-pi-ai` в
+`cordis.patch.yml`. Ключ провайдера остаётся в DSH (`~/.dsh/.env` или
+credentials); в Neiro Brain его нет, и запросы к моделям через него не идут.
 
-Создайте/дополните `~/.dsh/profiles/web/cordis.patch.yml`:
-
-```yaml
-# 1. Провайдер модели: всё идёт через прокси Neiro Brain.
-- id: llm-pi-ai
-  config:
-    providers:
-      neiro-brain:
-        displayName: Neiro Brain (DeepSeek)
-        api: openai-completions
-        apiKeyEnv: DEEPSEEK_API_KEY
-        baseURL: http://127.0.0.1:8080/v1
-        headers:
-          X-Neiro-Proxy-Token: dev-brain-token
-          X-Neiro-Upstream: deepseek
-        models:
-          - id: deepseek-flash
-            name: DeepSeek Flash via Neiro Brain
-            reasoningEfforts:
-              off:
-              low: low
-              medium: high
-              high: max
-          - id: deepseek-v4-pro
-            name: DeepSeek V4 Pro via Neiro Brain
-            reasoningEfforts:
-              off:
-              low: low
-              medium: high
-              high: max
-        compat:
-          supportsDeveloperRole: false
-          maxTokensField: max_tokens
-          supportsReasoningEffort: true
-          thinkingFormat: deepseek
-
-# 2. Новые сессии по умолчанию — через Neiro Brain.
-- id: agent-default-model
-  config:
-    provider: neiro-brain
-    model: deepseek-flash
-```
-
-Пояснения:
-
-- **Патч заменяет всю строку `config`, а не сливает ключи.** `llm-pi-ai` в базовом
-  профиле смонтирован без провайдеров, поэтому замена безопасна. Если вы уже
-  добавляли туда свои маршруты — перенесите их в этот же блок.
-- `baseURL` обязательно с `/v1`: без него прокси ответит
-  `404 chat/completions could not be found`.
-- `compat` нужен, потому что прокси — не OpenAI: иначе pi-ai может отправить роль
-  `developer` и `max_completion_tokens`, которые DeepSeek не понимает.
-- `reasoningEfforts` — это отображение уровней DSH на то, что понимает DeepSeek:
-  `low → low`, `medium → high`, `high → max`. Уровень выбирается в UI.
-- `agent-default-model` избавляет от ручного выбора модели в каждой новой сессии.
-
-Проверьте, что патч применился:
-
-```bash
-dsh --profile web --dump-config | grep -A 8 'llm-pi-ai'
-```
-
-Патч рассчитан на DSH 0.2.x: строки `llm-pi-ai` и `agent-default-model` есть в
-базовом профиле. Если в вашей версии id строк другие — сверьтесь с выводом
-`--dump-config`. Если блок `agent-default-model` вызывает ошибку схемы, удалите
-его и выберите модель в UI вручную.
-
-Перезапустите харнесс (`Ctrl+C`, затем снова `dsh web --no-open`) и в UI:
-**Settings → Models → Neiro Brain (DeepSeek) → deepseek-flash**, уровень
-размышления — там же.
-
-Проверка прокси в обход DSH:
-
-```bash
-export DEEPSEEK_API_KEY='sk-...'
-
-curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
-  -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-  -H "X-Neiro-Proxy-Token: dev-brain-token" \
-  -H "X-Neiro-Upstream: deepseek" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"Ответь одним словом: работает?"}]}'
-```
-
-Ожидаемо: JSON с `choices[].message.content` и заголовок `X-Neiro-Memory-Hits`
-в ответе. Без ключа провайдера можно проверить сам прокси: `X-Neiro-Upstream: mock` —
-ответит без сети и покажет найденную память в теле.
+Если раньше в профиле был провайдер `neiro-brain` с `baseURL …/v1` — удалите его:
+такого endpoint больше нет. Подробно о DSH и MCP: [deepseek-harness.md](deepseek-harness.md).
 
 ---
 
@@ -732,7 +589,7 @@ curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
         transport: streamable-http
         url: http://127.0.0.1:8080/mcp/knowledge
         headers:
-          Authorization: Bearer dev-brain-token
+          Authorization: Bearer nb-…
 ```
 
 Пакет `@deepseek-ai/dsh-mcp-client` уже входит в поставку CLI — отдельно ставить
@@ -743,7 +600,7 @@ curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
 - `mcp__neiro-brain__get_project_context`
 - `mcp__neiro-brain__search_knowledge`
 - `mcp__neiro-brain__get_knowledge`
-- `mcp__neiro-brain__remember_knowledge`
+- `mcp__neiro-brain__remember_many`
 - `mcp__neiro-brain__list_projects`
 - `mcp__neiro-brain__recent_knowledge`
 - `mcp__neiro-brain__delete_knowledge`
@@ -752,7 +609,7 @@ curl -i -sS http://127.0.0.1:8080/v1/chat/completions \
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8080/mcp/knowledge \
-  -H "Authorization: Bearer dev-brain-token" \
+  -H "Authorization: Bearer nb-…" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
@@ -761,8 +618,8 @@ curl -sS -X POST http://127.0.0.1:8080/mcp/knowledge \
       }}'
 ```
 
-Если ответ `401` — токен не совпал. Помните: после инициализации настроек токен
-берётся из админки, а не из `.env`.
+Если ответ `401` — токен неверный, отозван или истёк: выпустите новый в
+`/app/tokens`. Токен из `.env` больше не используется.
 
 ### Другие харнессы (опционально)
 
@@ -774,7 +631,7 @@ endpoint с тем же токеном:
   "mcpServers": {
     "neiro-brain": {
       "url": "http://127.0.0.1:8080/mcp/knowledge",
-      "headers": { "Authorization": "Bearer dev-brain-token" }
+      "headers": { "Authorization": "Bearer nb-…" }
     }
   }
 }
@@ -782,48 +639,41 @@ endpoint с тем же токеном:
 
 ```bash
 claude mcp add --transport http neiro-brain http://127.0.0.1:8080/mcp/knowledge \
-  --header "Authorization: Bearer dev-brain-token"
+  --header "Authorization: Bearer nb-…"
 ```
 
-OpenAI-совместимым клиентам достаточно поменять base URL на
-`http://127.0.0.1:8080/v1` и добавить те же два заголовка
-(`X-Neiro-Proxy-Token`, `X-Neiro-Upstream`).
+Другим харнессам нужен только этот MCP-endpoint: модели через Neiro Brain не
+идут, поэтому base URL менять не нужно.
 
 ---
 
 ## 11. Шаг 9. Сквозная проверка
 
-1. **Диалог записан.** В DSH отправьте сообщение через модель Neiro Brain.
-   В админке → **Диалоги** появится сессия с сообщениями и статусом.
-
-2. **Память подмешивается.** В ответе на запрос есть заголовок
-   `X-Neiro-Memory-Hits` (виден в логах/через curl). Пока база пуста — `0`.
-
-3. **Знания извлекаются.**
-
-   ```bash
-   docker compose exec app php artisan brain:sync --force
-   docker compose exec app php artisan brain:stats
-   docker compose exec app php artisan brain:search "стек"
-   ```
-
-   `brain:stats` покажет диалоги, карточки, чанки и термины индекса. Если карточек
-   `0` — смотрите «Диалоги» в админке (статус и ошибка) и
-   `docker compose logs app`.
-
-4. **MCP отвечает.** В новой сессии DSH:
+1. **MCP отвечает.** В новой сессии DSH:
 
    > Найди в базе знаний, какой у меня стек и что мы решили по проекту.
 
    Агент вызовет `mcp__neiro-brain__search_knowledge` и покажет карточки.
+   Пустая база — честное «знаний нет».
 
-5. **Запись через MCP.** Попросите:
+2. **Запись через MCP.** Попросите:
 
-   > Запомни: предпочитаю модульный монолит и Pest для тестов.
+   > Запомни: предпочитаю модульный монолит и PHPUnit для тестов.
 
-   Агент вызовет `remember_knowledge`; карточка появится в админке → **Знания**.
+   Агент вызовет `remember_many`; карточка появится в кабинете (`/app/search`) и
+   в админке → **Знания**.
 
-Цикл замкнут: чат → прокси → PostgreSQL → `brain:sync` → карточки → MCP → промпт.
+3. **Проверка из консоли.**
+
+   ```bash
+   docker compose exec app php artisan brain:stats --user=owner@example.com
+   docker compose exec app php artisan brain:search "стек" --user=owner@example.com
+   ```
+
+   `brain:stats` покажет карточки, чанки и термины индекса. Если карточек `0` —
+   проверьте ответ MCP и `docker compose logs app`.
+
+Цикл: MCP → PostgreSQL → BM25 → MCP; человек читает те же карточки в кабинете.
 
 ---
 
@@ -835,11 +685,9 @@ OpenAI-совместимым клиентам достаточно поменя
 docker compose ps
 docker compose logs -f app
 docker compose logs -f web
-docker compose logs -f scheduler
 docker compose logs -f db
 
 docker compose exec app php artisan about
-docker compose exec app php artisan schedule:list
 ```
 
 Логи Laravel идут в stderr контейнера (`LOG_CHANNEL=stderr`), nginx — в свой stdout.
@@ -847,7 +695,7 @@ docker compose exec app php artisan schedule:list
 ### Перезапуск после правок
 
 ```bash
-docker compose restart app scheduler   # после .env, конфигов, кода
+docker compose restart app   # после .env, конфигов, кода
 docker compose exec app php artisan optimize:clear
 ```
 
@@ -872,8 +720,7 @@ docker compose exec app php artisan optimize:clear
 ### Бэкап
 
 Данные — в томе `neiro-brain_pgdata`, секреты — в `.env` (`APP_KEY`). Бэкапить
-нужно **и то, и другое**: без `APP_KEY` зашифрованные токены и ключ суммаризации
-не восстановить.
+нужно **и то, и другое**: без `APP_KEY` зашифрованные настройки не восстановить.
 
 ```bash
 docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
@@ -882,18 +729,18 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 cp .env "neiro-brain-env-$(date +%F).backup"
 ```
 
-Восстановление (остановите `app` и `scheduler`, чтобы не держали соединения):
+Восстановление (остановите `app`, чтобы не держал соединения):
 
 ```bash
-docker compose stop app scheduler
+docker compose stop app
 cat neiro-brain-2026-11-09.dump | \
   docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
-docker compose start app scheduler
+docker compose start app
 ```
 
 ### Смена токенов
 
-1. Админка → **Настройки → Токен доступа** → «Сгенерировать новый» → «Скопировать».
+1. Кабинет → **Токены** → «Выпустить» (или «Отозвать» старый).
 2. Обновить значение в `~/.dsh/profiles/web/cordis.patch.yml`.
 3. Перезапустить `dsh web`.
 
@@ -919,7 +766,7 @@ wildcard-адреса (`--host 0.0.0.0` → usage error), а по умолчан
 |---|---|
 | Ежедневная работа с GUI | DSH нативно на macOS (эта инструкция) |
 | Автоматизация, cron, CI | DSH в контейнере в режиме `headless` — ему не нужен HTTP-сервер |
-| Сервер без GUI | `dsh --profile headless` + прокси на `http://host.docker.internal:8080/v1` |
+| Сервер без GUI | `dsh --profile headless` + MCP на `http://host.docker.internal:8080/mcp/knowledge` |
 
 Пример headless-запуска (одноразовая задача, без публикации портов):
 
@@ -933,10 +780,9 @@ docker run --rm \
           dsh --profile headless --patch /root/.dsh/headless-neiro.patch.yml "собери отчёт по git log"'
 ```
 
-В `headless-neiro.patch.yml` — те же блоки, что в шаге 7 (`llm-pi-ai` и
-`agent-default-model`), но с `baseURL: http://host.docker.internal:8080/v1`; MCP-сервер
-туда же (`http://host.docker.internal:8080/mcp/knowledge`). Учтите: в контейнере DSH
-видит только смонтированные каталоги, а не весь ваш Mac.
+В `headless-neiro.patch.yml` — обычный провайдер модели DSH (ключ в окружении) и
+MCP-сервер (`http://host.docker.internal:8080/mcp/knowledge`). Учтите: в контейнере
+DSH видит только смонтированные каталоги, а не весь ваш Mac.
 
 ---
 
@@ -949,20 +795,19 @@ docker run --rm \
 | `SQLSTATE[08006]` / `password authentication failed` | Пароль в `.env` не совпадает с тем, с которым создан том `pgdata`. Либо верните старый пароль, либо `docker compose down -v` (удалит базу) |
 | `No application encryption key has been specified` | Пустой `APP_KEY`: сгенерируйте и перезапустите |
 | `419 Page Expired` на логине | Сменился `APP_KEY` или остались старые cookies. Очистите cookies для `localhost:8080`, `docker compose exec app php artisan optimize:clear` |
-| `401 invalid_token` от прокси | Не совпал `X-Neiro-Proxy-Token`. Токен берётся из админки; после первого старта `.env` его уже не меняет |
-| `503` от прокси | DSH не прислал `Authorization`/`X-Neiro-Upstream` или upstream недоступен |
-| `404 chat/completions could not be found` | В `baseURL` забыли `/v1` |
-| `400 model not found` | Id модели не совпал с тем, что отдаёт DeepSeek. Проверьте `models[].id` в патче или выберите другую модель в UI |
-| DSH: `MISSING_CREDENTIAL` | Нет `DEEPSEEK_API_KEY` в окружении и `~/.dsh/.env`; добавьте и перезапустите |
-| В Models нет провайдера Neiro Brain | Патч не применён или правится не тот профиль (`web` vs `desktop`). Проверьте `dsh --profile web --dump-config` |
-| MCP-инструментов нет | Неверный `url`/токен, либо DSH не перезапущен. Проверьте `curl` из шага 10 |
+| `401 invalid_token` от MCP | Токен неверный, отозван или истёк: выпустите новый в `/app/tokens` |
+| `403 insufficient_ability` | У токена только `read`, а MCP требует `write` |
+| `503 no_owner` | В базе нет активного пользователя: `brain:user …` |
+| `400 model not found` | Id модели не совпал с тем, что отдаёт провайдер. Проверьте `models[].id` в патче или выберите другую модель в UI |
+| DSH: `MISSING_CREDENTIAL` | Нет ключа провайдера в окружении и `~/.dsh/.env`; добавьте и перезапустите |
+| MCP-инструментов нет | Неверный `url`/`serverName`/токен, либо DSH не перезапущен. Проверьте `curl` из шага 10 |
 | `dsh: command not found` | `npm config get prefix`/`PATH`; переустановите `npm i -g @deepseek-ai/dsh` |
 | Порт 3080 занят | `dsh web --port 3081 --no-open`, открыть новый адрес |
 | `npm error engine Unsupported engine` | Node старее 24.9: `brew upgrade node` |
 | `permission denied` в `storage/` | `docker compose restart app` (entrypoint переставит владельца) или `docker compose exec app chown -R www-data:www-data storage bootstrap/cache` |
 | `Permission denied` при чтении `.env` | Файл закрыт правами: `chmod 644 .env` — его читает `www-data` внутри контейнера |
 | Медленные ответы или таймаут 120 c | Понизьте reasoning в DSH (`low`): модель думает перед каждым tool-call |
-| Карточек нет после `brain:sync` | Нет ключа в «Суммаризация» (работает эвристика), диалог ещё не «тихий» (используйте `--force`), либо фильтр качества отбросил факты — смотрите «Диалоги» |
+| Карточек нет после записи | MCP вернул `rejected`: смотрите причину в ответе и `docker compose logs app` |
 
 ---
 
@@ -972,17 +817,15 @@ docker run --rm \
 - [ ] Репозиторий склонирован в `~/www/neiro-brain`
 - [ ] Созданы `Dockerfile`, `docker-compose.yml`, `docker/` (3 файла), `.dockerignore`
 - [ ] В `.env` заданы `APP_KEY`, `DB_*`, `APP_URL`, `APP_PORT`, `LOG_CHANNEL=stderr`
-- [ ] `docker compose up -d` — все четыре сервиса `running`
+- [ ] `docker compose up -d` — сервисы `app`, `web`, `db` в состоянии `running`
 - [ ] `php artisan migrate --force` выполнен
-- [ ] Администратор создан, вход в `/admin` работает
-- [ ] `brain:stats` отвечает без ошибок
-- [ ] В админке включены прокси, память, захват диалогов
-- [ ] В «Суммаризация» указан ключ DeepSeek и модель `deepseek-flash`
+- [ ] Человек создан `brain:user`, вход в `/app` работает; вход в `/admin` — если нужен
+- [ ] `brain:stats --user=…` отвечает без ошибок
+- [ ] Личный токен выпущен в кабинете (`read + write`) и вставлен в конфиг MCP
 - [ ] Node ≥ 24.9, `dsh --version` работает
-- [ ] `~/.dsh/profiles/web/cordis.patch.yml` содержит провайдера, `agent-default-model`, MCP
-- [ ] В DSH выбрана модель «Neiro Brain (DeepSeek)»
+- [ ] `~/.dsh/profiles/web/cordis.patch.yml` содержит MCP-сервер `neiro-brain`
 - [ ] MCP-инструменты `mcp__neiro-brain__*` видны в сессии
-- [ ] `brain:sync --force` создаёт карточки, `brain:search` их находит
+- [ ] `remember_many` создаёт карточку, `search_knowledge` её находит
 
 ---
 
@@ -990,7 +833,7 @@ docker run --rm \
 
 - Документация репозитория: [`docs/quickstart.md`](quickstart.md),
   [`docs/deepseek-harness.md`](deepseek-harness.md), [`docs/mcp.md`](mcp.md),
-  [`docs/proxy.md`](proxy.md), [`docs/operations.md`](operations.md)
+  [`docs/operations.md`](operations.md)
 - DSH CLI и профили: <https://deepseek-harness.github.io/>
 - Пакет CLI: <https://www.npmjs.com/package/@deepseek-ai/dsh>
 - MCP-клиент DSH: <https://www.npmjs.com/package/@deepseek-ai/dsh-mcp-client>

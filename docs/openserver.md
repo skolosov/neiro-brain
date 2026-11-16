@@ -19,10 +19,10 @@
 ```
 .osp/
 ├── project.ini   # домен, bind_ip, алиасы, PHP/Apache, TLS
-├── tasks.ini     # Laravel Schedule каждую минуту
+├── tasks.ini     # Laravel Schedule каждую минуту (больше не нужен)
 ├── env.ini       # переменные окружения проекта
 └── bin/
-    └── brain.cmd # brain sync/stats/search внутри среды проекта
+    └── brain.cmd # brain stats/search/reindex внутри среды проекта
 ```
 
 ### `project.ini`
@@ -49,19 +49,14 @@ tls_enabled    = on
 
 ### `tasks.ini`
 
-```ini
-[neiro-brain.local]
-Laravel Schedule = * * * * * * * cmd.exe /c "osp project neiro-brain.local & php artisan schedule:run >> {base_dir}\storage\logs\scheduler.log 2>&1"
-```
+Планировщик больше не нужен: расписания нет, знания пишутся по запросу агента
+через MCP. Задачу `Laravel Schedule` можно удалить из `.osp\tasks.ini` — иначе она
+раз в минуту запускает пустой `schedule:run`.
 
-OpenServer сам вызывает Laravel-планировщик каждую минуту; отдельный Task Scheduler
-для `brain:sync` не нужен. `brain:sync` выполняется по расписанию каждые 15 минут.
-
-Проверка:
+Проверка, что расписания действительно нет:
 
 ```powershell
 php artisan schedule:list
-Get-Content storage\logs\scheduler.log -Tail 20
 ```
 
 ## Важно: pgsql для PHP-8.4
@@ -155,14 +150,15 @@ http://95.79.97.24:7777/admin
 
 ## Безопасность при публикации
 
-Наружу открываются админка, прокси и MCP. Перед публикацией:
+Наружу открываются админка, кабинет, MCP и HTTP API. Перед публикацией:
 
 - смените пароль администратора MoonShine;
-- смените токен доступа в админке (Настройки → Токен доступа) или `brain:token --generate`;
+- отзовите старые и выпустите новые личные токены в кабинете (`/app/tokens`);
 - включите HTTPS и по возможности ограничьте доступ по IP в роутере/файрволе;
 - не оставляйте `APP_DEBUG=true` в публичном окружении;
 - помните, что локальный TLS-сертификат вызовет предупреждение у внешних клиентов;
-  для нормального HTTPS используйте домен + Let's Encrypt/Caddy или reverse-proxy.
+  для нормального HTTPS используйте домен + Let's Encrypt/Caddy или nginx с
+  сертификатом.
 
 Альтернатива пробросу портов — Cloudflare Tunnel/ngrok: не требует статического IP
 и не открывает порты роутера, но внешний URL будет другим.
@@ -176,5 +172,5 @@ http://95.79.97.24:7777/admin
 | «Как вы здесь оказались?» | запрошен IP/домен, которого нет в `server_aliases` |
 | Домен не резолвится | проверьте HOSTS, перезапустите OpenServer |
 | `http://95.79.97.24:7777` не открывается | нет проброса портов или IP сменился |
-| Cron не срабатывает | `storage\logs\scheduler.log`, `php artisan schedule:list`, статус задачи в OpenServer |
+| Планировщик не срабатывает | не нужен: расписания нет; задачу из `.osp\tasks.ini` можно удалить |
 | 500 после смены домена | `APP_URL`, `storage/logs/laravel.log`, `php artisan optimize:clear` |

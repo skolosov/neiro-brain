@@ -1,111 +1,35 @@
-# DeepSeek Harness + Neiro Brain
+# Подключение DeepSeek Harness по MCP
 
-Подключение проверено на DeepSeek Harness (`DSH_HOME=C:\Users\Admin\.dsh`, профиль `desktop`).
-
-## Схема
+DSH — обычный MCP-клиент Neiro Brain: инструменты `mcp__neiro-brain__*` дают
+агенту поиск и запись знаний. Модель к этому отношения не имеет — провайдер,
+ключ и reasoning настраиваются в DSH как всегда, через Neiro Brain запросы к
+моделям больше не идут.
 
 ```
 DeepSeek Harness
-   ├─ model: Neiro Brain (DeepSeek) ──► http://127.0.0.1/v1 ──► DeepSeek API
-   │                                      (memory + capture)
+   ├─ модель: провайдер DSH ──────────► API провайдера (напрямую)
    └─ MCP: neiro-brain ───────────────► http://127.0.0.1/mcp/knowledge
+                                         Authorization: Bearer nb-…
 ```
 
-- Все запросы DSH идут через Neiro Brain: пользовательская память подмешивается в prompt,
-  диалог сохраняется в PostgreSQL.
-- MCP-инструменты `mcp__neiro-brain__*` позволяют агенту искать и запоминать знания.
-- **Провайдер, ключ, модель и reasoning выбираются в DSH.** Neiro Brain не хранит
-  ключ DeepSeek; он получает провайдерский `Authorization` от харнесса и передаёт его
-  upstream. В Neiro Brain остаётся только собственный proxy-токен.
+## 1. Личный токен
 
-## 1. Neiro Brain: без ключа провайдера
+1. В базе должен быть активный пользователь:
 
-Админка → **Настройки → Прокси для харнессов**: там есть только
+   ```powershell
+   php artisan brain:user --email=owner@example.com --name="Владелец" --password="пароль"
+   ```
 
-- Bearer-токен для харнесса (`dev-brain-token`);
-- top K и лимит блока памяти;
-- переключатели памяти/захвата.
+2. Войти в `http://127.0.0.1/app` и открыть **Токены → Выпустить**.
+3. Дать право `read + write` (MCP умеет писать и удалять), скопировать `nb-…`.
 
-Провайдера, Base URL и API-ключа DeepSeek в админке нет. Харнесс присылает:
+Токен показывается один раз, в базе лежит только SHA-256. Отзыв — там же.
+Дев-токена и токена в адресе нет.
 
-| Заголовок | Значение |
-|---|---|
-| `Authorization` | `Bearer <DEEPSEEK_API_KEY>` — ключ провайдера |
-| `X-Neiro-Proxy-Token` | `dev-brain-token` — доступ к Neiro Brain |
-| `X-Neiro-Upstream` | `deepseek` — какой upstream использовать |
+## 2. MCP-сервер в DSH
 
-Проверка (ключ подставьте свой):
-
-```bash
-curl http://127.0.0.1/v1/chat/completions \
-  -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
-  -H "X-Neiro-Proxy-Token: dev-brain-token" \
-  -H "X-Neiro-Upstream: deepseek" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-flash","reasoning_effort":"high","messages":[{"role":"user","content":"Какой у меня стек?"}]}'
-```
-
-Старый режим тоже работает: если `X-Neiro-Proxy-Token` не передан, `Authorization`
-считается токеном Neiro Brain, а ключ провайдера берётся из `DEEPSEEK_API_KEY`
-в окружении PHP. Но для DSH используется режим выше — ключ остаётся в харнессе.
-
-## 2. DSH: провайдер модели
-
-Файл: `C:\Users\Admin\.dsh\profiles\desktop\cordis.patch.yml`
-
-```yaml
-- id: llm-pi-ai
-  name: "@deepseek-ai/dsh-llm-pi-ai"
-  config:
-    providers:
-      neiro-brain:
-        displayName: Neiro Brain (DeepSeek)
-        api: openai-completions
-        apiKeyEnv: DEEPSEEK_API_KEY
-        baseURL: http://127.0.0.1/v1
-        headers:
-          X-Neiro-Proxy-Token: dev-brain-token
-          X-Neiro-Upstream: deepseek
-        models:
-          - id: deepseek-flash
-            name: DeepSeek Flash via Neiro Brain
-            reasoningEfforts:
-              off:
-              low: low
-              medium: high
-              high: max
-          - id: deepseek-v4-pro
-            name: DeepSeek V4 Pro via Neiro Brain
-            reasoningEfforts:
-              off:
-              low: low
-              medium: high
-              high: max
-        compat:
-          supportsDeveloperRole: false
-          maxTokensField: max_tokens
-          supportsReasoningEffort: true
-          thinkingFormat: deepseek
-```
-
-В UI: **Settings → Models → Neiro Brain (DeepSeek)** → выбрать `deepseek-flash`
-и уровень размышления. Новые сессии пойдут через прокси; старые сохраняют свою модель.
-
-Base URL и модели можно менять в UI, но **кастомные заголовки**
-(`X-Neiro-Proxy-Token`, `X-Neiro-Upstream`) задаются только в `cordis.patch.yml`
-(в Settings есть кнопка **Open configuration file**). Без них прокси не поймёт,
-что `Authorization` — это ключ провайдера.
-
-`reasoningEfforts` — это отображение уровней DSH на то, что понимает DeepSeek:
-`low → low`, `medium → high`, `high → max`. Выбор остаётся в харнессе; прокси
-ничего не подставляет.
-
-`compat` нужен, потому что прокси — не OpenAI: без него pi-ai может отправить
-`developer`-роль и `max_completion_tokens`, которые gateway отвергнет.
-
-## 3. DSH: MCP-сервер
-
-Тот же файл, отдельный `insert`:
+Файл профиля: `C:\Users\Admin\.dsh\profiles\desktop\cordis.patch.yml` (для CLI —
+`~/.dsh/profiles/web/cordis.patch.yml`). Добавьте блок:
 
 ```yaml
 - insert:
@@ -116,58 +40,85 @@ Base URL и модели можно менять в UI, но **кастомны�
         transport: streamable-http
         url: http://127.0.0.1/mcp/knowledge
         headers:
-          Authorization: Bearer dev-brain-token
+          Authorization: Bearer nb-…
 ```
 
-После перезагрузки страницы DSH появляются инструменты:
+- Пакет `@deepseek-ai/dsh-mcp-client` входит в поставку DSH — ставить отдельно
+  не нужно.
+- `streamable-http` — единственный транспорт: stdio у Neiro Brain удалён.
+- Токен лежит в YAML открытым текстом; это локальный профиль, не коммитьте его.
+- Если блок `insert` уже есть, добавьте элемент в существующий список, а не
+  создавайте второй.
 
+После перезапуска DSH (`Ctrl+C`, затем снова `dsh web --no-open` или перезапуск
+приложения) в сессии появятся инструменты:
+
+- `mcp__neiro-brain__get_project_context`
 - `mcp__neiro-brain__search_knowledge`
 - `mcp__neiro-brain__get_knowledge`
-- `mcp__neiro-brain__remember_knowledge`
+- `mcp__neiro-brain__remember_many`
+- `mcp__neiro-brain__delete_knowledge`
 - `mcp__neiro-brain__list_projects`
 - `mcp__neiro-brain__recent_knowledge`
 
-Проверка в сессии:
+## 3. Модель
 
-> Найди в памяти, какой у меня стек и что мы решили по проекту Sklad.
+Ничего специального для Neiro Brain не нужно: выберите провайдера и модель в
+DSH обычным способом (**Settings → Models**) или своим блоком `llm-pi-ai`.
+Ключ провайдера остаётся в DSH (`~/.dsh/.env` или credentials), в Neiro Brain его
+нет.
 
-## 4. Токен
+Проверка, что MCP подключён, а не модель:
 
-Токен один на все три входа: `X-Neiro-Proxy-Token` для `/v1/*`,
-`Authorization: Bearer` для `/mcp/knowledge` и `/api/v1/*`, и его же можно
-положить в адрес прокси (`http://host/<токен>/v1`).
+> Найди в базе знаний, какой у меня стек и что мы решили по проекту.
 
-`dev-brain-token` — значение из репозитория. Оно работает **только с localhost**:
-запрос с любого другого адреса по нему получает 401, иначе публичный сервер
-открывался бы по строке, которую знает любой читатель исходников.
+Агент вызовет `search_knowledge`; при пустой базе честно скажет, что знаний нет.
 
-Свой токен:
+## 4. Скилл `/brain`
 
 ```powershell
-php artisan brain:token --generate   # создать nb-… и напечатать его
-php artisan brain:token             # показать текущий (замаскирован) и его источник
-php artisan brain:token --prune     # удалить поля старых токенов из settings
+php artisan brain:skill            # ~/.agents/skills/brain/SKILL.md
+php artisan brain:skill --force    # перезаписать
 ```
 
-`--prune` откажется удалять, если действующий токен — значение из репозитория:
-в старых полях может лежать единственная копия рабочего токена. Сначала задайте
-настоящий токен, потом чистите.
+Тонкий файл на диске велит прочитать ресурс `knowledge://skill/brain` — полный
+протокол сервер отдаёт сам, поэтому правила не отстают от версии кода.
+`/brain compact` — слияние дублей: план, подтверждение, `remember_many` с
+`supersedes`.
 
-`BRAIN_TOKEN` в `.env` — начальное значение: им заполняется пустая настройка
-`security.access_token`. После `--generate` или сохранения формы в админке
-рулит настройка, а не `.env`.
+`instructions` MCP-сервер собирает на каждый запрос (базовые правила, правила
+владельца, имя/язык/проекты), но **клиент кэширует их на сессию**. После смены
+правил или профиля начните новую сессию.
 
-Скопируйте токен в `cordis.patch.yml` (заголовок MCP и адрес прокси) и
-перезагрузите DSH. Токены в YAML лежат открыто — это локальный профиль; не
-коммитьте его в публичный репозиторий.
+## 5. Проверка без DSH
 
-## 5. Если не работает
+```bash
+curl -sS http://127.0.0.1/mcp/knowledge \
+  -H "Authorization: Bearer nb-…" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+        "name":"search_knowledge","arguments":{"query":"стек","limit":3}}}'
+```
+
+Список инструментов:
+
+```bash
+curl -sS http://127.0.0.1/mcp/knowledge \
+  -H "Authorization: Bearer nb-…" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+## 6. Если не работает
 
 | Симптом | Причина |
 |---|---|
-| `MISSING_CREDENTIAL` | DSH не нашёл `DEEPSEEK_API_KEY`; добавьте ключ в Settings → Models |
-| 401 от прокси | неверный `X-Neiro-Proxy-Token` (или `Authorization`, если режим старый) |
-| 503 от прокси | харнесс не прислал `Authorization`/`X-Neiro-Upstream`, либо upstream недоступен |
-| Нет провайдера в Models | DSH не перечитал `cordis.patch.yml`; обновите страницу/перезапустите DSH |
-| MCP-инструментов нет | проверьте `serverName` и `url`; DSH должен быть запущен после правки |
-| Долгий ответ | DeepSeek V4 Flash думает; для коротких задач выбирайте уровень `low` |
+| `401 invalid_token` | токен неверный, отозван или истёк; выпустите новый в `/app/tokens` |
+| `403 insufficient_ability` | у токена только `read`; для MCP нужен `write` |
+| `503 no_owner` | в базе нет активного пользователя: `php artisan brain:user …` |
+| MCP-инструментов нет | неверный `url`/`serverName`, DSH не перезапущен |
+| Инструменты есть, поиск пуст | база пустая или другой проект; сначала `remember_many` |
+| `instructions` старые | клиент кэширует на сессию — начните новую |
+| Модель не отвечает | это не Neiro Brain: проверьте провайдера и ключ в Settings → Models |

@@ -5,9 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\KnowledgeKind;
+use App\Enums\KnowledgeScope;
+use App\Mcp\Resources\KnowledgeEntryResource;
+use App\Mcp\Resources\KnowledgeIndexResource;
 use App\Mcp\Servers\KnowledgeServer;
 use App\Mcp\Tools\DeleteKnowledgeTool;
 use App\Mcp\Tools\GetKnowledgeTool;
+use App\Mcp\Tools\ListProjectsTool;
+use App\Mcp\Tools\ProjectContextTool;
+use App\Mcp\Tools\RecentKnowledgeTool;
+use App\Mcp\Tools\SearchKnowledgeTool;
 use App\Models\KnowledgeEntry;
 use App\Models\User;
 use App\Services\Brain\Dto\ExtractedEntry;
@@ -40,13 +47,18 @@ class OwnerIsolationTest extends TestCase
         ]);
     }
 
-    private function write(string $title, string $content, ?string $project = null): KnowledgeEntry
-    {
+    private function write(
+        string $title,
+        string $content,
+        ?string $project = null,
+        KnowledgeScope $scope = KnowledgeScope::Project,
+    ): KnowledgeEntry {
         $result = app(KnowledgeWriter::class)->write(new ExtractedEntry(
             kind: KnowledgeKind::Fact,
             title: $title,
             content: $content,
             project: $project,
+            scope: $scope,
             importance: 3,
             confidence: 1.0,
         ));
@@ -69,6 +81,10 @@ class OwnerIsolationTest extends TestCase
         $result = app(KnowledgeSearch::class)->search(new SearchQuery('ксилофонный'));
 
         $this->assertTrue($result->isEmpty());
+
+        // То же через сам инструмент: имя карточки не должно просочиться.
+        $tool = KnowledgeServer::tool(SearchKnowledgeTool::class, ['query' => 'ксилофонный']);
+        $tool->assertOk()->assertSee('Ничего не найдено')->assertDontSee('Секрет первого');
 
         // Своя карточка после возврата контекста находится.
         $this->withOwner($first);
@@ -149,7 +165,7 @@ class OwnerIsolationTest extends TestCase
         ));
     }
 
-    /** (е) N и avgdl в BM25 считаются только по корпусу владельца. */
+    /** (е) N, avgdl и df в BM25 считаются только по корпусу владельца. */
     public function test_bm25_corpus_is_scoped_to_the_owner(): void
     {
         $first = $this->owner();
@@ -157,14 +173,22 @@ class OwnerIsolationTest extends TestCase
         $this->write('Стек первого', 'Laravel и PostgreSQL в первом корпусе.');
         $this->write('Вторая карточка первого', 'Docker и Redis в первом корпусе.');
 
+        // Снимаем статистику до появления чужого корпуса.
+        $before = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'));
+        $this->assertNotEmpty($before->hits);
+        $beforeScore = $before->hits[0]->score;
+        $beforeCandidates = $before->candidates;
+
         $second = $this->secondOwner();
         $this->withOwner($second);
 
-        // Пять карточек второго владельца: N и avgdl у него заметно другие.
+        // Пять карточек второго владельца, три из них — с тем же термином
+        // Laravel и длинным текстом: если фильтр перенести на выдачу, изменятся
+        // N, avgdl и df, а не только набор строк.
         $this->write('Редкий термин', 'Квазарный телескоп наблюдает далёкий квазар.');
-        $this->write('Второго владельца 2', 'Заметка про кэш и очереди.');
-        $this->write('Второго владельца 3', 'Заметка про миграции и индексы.');
-        $this->write('Второго владельца 4', 'Заметка про тесты и покрытие.');
+        $this->write('Чужой Laravel 1', str_repeat('Laravel ', 40).'и ещё текст для длины.');
+        $this->write('Чужой Laravel 2', str_repeat('Laravel ', 40).'другой длинный текст.');
+        $this->write('Чужой Laravel 3', str_repeat('Laravel ', 40).'третий длинный текст.');
         $this->write('Второго владельца 5', 'Заметка про деплой и мониторинг.');
 
         $own = app(KnowledgeSearch::class)->search(new SearchQuery('квазарный'));
@@ -175,11 +199,13 @@ class OwnerIsolationTest extends TestCase
         $foreign = app(KnowledgeSearch::class)->search(new SearchQuery('квазарный'));
         $this->assertTrue($foreign->isEmpty());
 
-        // Общий термин первого корпуса по-прежнему находится: статистика
-        // считается по двум его карточкам, а не по семи карточкам инстанса.
+        // Общий термин первого корпуса по-прежнему находится, а его score и
+        // число кандидатов не изменились: чужие чанки не попали в $base.
         $common = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'));
         $this->assertNotEmpty($common->hits);
         $this->assertSame('Стек первого', $common->hits[0]->entry->title);
+        $this->assertSame($beforeCandidates, $common->candidates);
+        $this->assertEqualsWithDelta($beforeScore, $common->hits[0]->score, 0.0001);
     }
 
     /** API не отдаёт чужую карточку по id: вместо этого 404. */
@@ -194,5 +220,133 @@ class OwnerIsolationTest extends TestCase
 
         $this->getJson('/api/v1/entries/'.$foreign->id)
             ->assertNotFound();
+    }
+
+    /** list_projects перечисляет только проекты владельца. */
+    public function test_list_projects_shows_only_own_projects(): void
+    {
+        $this->withOwner($this->owner());
+        $this->write('Своя карточка проекта', 'Описание своего проекта.', 'alpha-project');
+
+        $this->withOwner($this->secondOwner());
+        $this->write('Чужая карточка проекта', 'Описание чужого проекта.', 'beta-project');
+
+        $this->withOwner($this->owner());
+
+        KnowledgeServer::tool(ListProjectsTool::class, [])
+            ->assertOk()
+            ->assertSee('alpha-project')
+            ->assertDontSee('beta-project');
+    }
+
+    /** recent_knowledge не показывает чужие карточки. */
+    public function test_recent_knowledge_shows_only_own_cards(): void
+    {
+        $this->withOwner($this->owner());
+        $this->write('Своя свежая карточка', 'Свежий факт первого владельца.');
+
+        $this->withOwner($this->secondOwner());
+        $this->write('Чужая свежая карточка', 'Свежий факт второго владельца.');
+
+        $this->withOwner($this->owner());
+
+        KnowledgeServer::tool(RecentKnowledgeTool::class, ['days' => 365, 'limit' => 50])
+            ->assertOk()
+            ->assertSee('Своя свежая карточка')
+            ->assertDontSee('Чужая свежая карточка');
+    }
+
+    /** get_project_context собирает профиль и проект только из своих карточек. */
+    public function test_project_context_does_not_leak_foreign_cards(): void
+    {
+        $this->withOwner($this->owner());
+        $this->write('Мой профиль', 'Первый владелец любит PHPUnit.', null, KnowledgeScope::Profile);
+        $this->write('Моя проектная карточка', 'Факт про alpha-project.', 'alpha-project');
+
+        $this->withOwner($this->secondOwner());
+        $this->write('Чужой профиль', 'Второй владелец любит другой стек.', null, KnowledgeScope::Profile);
+        $this->write('Чужая проектная карточка', 'Факт про beta-project.', 'beta-project');
+
+        $this->withOwner($this->owner());
+
+        KnowledgeServer::tool(ProjectContextTool::class, ['project' => 'alpha-project'])
+            ->assertOk()
+            ->assertSee('Мой профиль')
+            ->assertSee('Моя проектная карточка')
+            ->assertDontSee('Чужой профиль')
+            ->assertDontSee('Чужая проектная карточка')
+            ->assertDontSee('beta-project');
+    }
+
+    /** Ресурсы index и entry/{id} не отдают чужое. */
+    public function test_knowledge_resources_do_not_expose_foreign_data(): void
+    {
+        $this->withOwner($this->owner());
+        $own = $this->write('Своя карточка ресурса', 'Данные первого владельца для ресурса.');
+
+        $this->withOwner($this->secondOwner());
+        $foreign = $this->write('Чужая карточка ресурса', 'Данные второго владельца для ресурса.');
+
+        $this->withOwner($this->owner());
+
+        KnowledgeServer::resource(KnowledgeIndexResource::class)
+            ->assertOk()
+            ->assertSee('Своя карточка ресурса')
+            ->assertDontSee('Чужая карточка ресурса');
+
+        KnowledgeServer::resource(KnowledgeEntryResource::class, ['id' => $own->id])
+            ->assertOk()
+            ->assertSee('Своя карточка ресурса');
+
+        KnowledgeServer::resource(KnowledgeEntryResource::class, ['id' => $foreign->id])
+            ->assertHasErrors(['не найдена']);
+    }
+
+    /** REST-чтение: поиск, проекты и статистика считают только свои строки. */
+    public function test_api_read_endpoints_return_only_own_data(): void
+    {
+        $this->withOwner($this->owner());
+        $this->write('Своя API карточка', 'Описание своего API-проекта.', 'alpha-project');
+
+        $this->withOwner($this->secondOwner());
+        $this->write('Чужая API карточка', 'Описание чужого API-проекта.', 'beta-project');
+
+        $this->withOwner($this->owner());
+
+        $this->getJson('/api/v1/search?q=карточка')
+            ->assertOk()
+            ->assertJsonFragment(['title' => 'Своя API карточка'])
+            ->assertJsonMissing(['title' => 'Чужая API карточка']);
+
+        $this->getJson('/api/v1/projects')
+            ->assertOk()
+            ->assertJsonFragment(['project' => 'alpha-project'])
+            ->assertJsonMissing(['project' => 'beta-project']);
+
+        $this->getJson('/api/v1/stats')
+            ->assertOk()
+            ->assertJsonPath('data.entries', 1);
+    }
+
+    /** Удаление человека уносит его карточки и токены, чужие остаются. */
+    public function test_deleting_a_user_removes_only_his_cards_and_tokens(): void
+    {
+        $first = $this->owner();
+        $this->withOwner($first);
+        $ownCard = $this->write('Карточка первого', 'Остаётся после удаления второго.');
+        $ownToken = $this->issueToken($first);
+
+        $second = $this->secondOwner();
+        $this->withOwner($second);
+        $foreignCard = $this->write('Карточка второго', 'Уходит вместе с владельцем.');
+        $foreignToken = $this->issueToken($second);
+
+        $second->delete();
+
+        $this->assertDatabaseMissing('knowledge_entries', ['id' => $foreignCard->id]);
+        $this->assertDatabaseMissing('api_tokens', ['id' => $foreignToken['token']->id]);
+
+        $this->assertDatabaseHas('knowledge_entries', ['id' => $ownCard->id]);
+        $this->assertDatabaseHas('api_tokens', ['id' => $ownToken['token']->id]);
     }
 }
