@@ -205,7 +205,6 @@ final class CardSearch
             'occurred_at_label' => ($entry->occurred_at ?? $entry->created_at)?->format('d.m.Y'),
             'updated_at' => $entry->updated_at?->format('d.m.Y H:i'),
             'last_verified_at' => $entry->last_verified_at?->format('d.m.Y'),
-            'source' => $entry->source?->name,
             'indexed' => $entry->indexed_at !== null,
         ];
     }

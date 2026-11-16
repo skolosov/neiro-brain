@@ -79,9 +79,11 @@ class SearchController extends Controller
             'title' => (string) $entry->title,
             'summary' => $summary,
             'project' => trim((string) $entry->project) !== '' ? (string) $entry->project : null,
+            // Подпись строки: тема, а если её нет — тип знания. Тег для этого
+            // не годится: «#verify» в колонке слева читается как мусор.
             'theme' => $entry->theme !== null && trim((string) $entry->theme) !== ''
                 ? (string) $entry->theme
-                : (($entry->tags[0] ?? null) ? (string) $entry->tags[0] : null),
+                : $entry->kind?->label(),
             'kind' => $entry->kind?->label(),
             'importance' => (int) $entry->importance,
             'updated_at' => $entry->updated_at?->format('d.m.Y'),

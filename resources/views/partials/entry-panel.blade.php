@@ -82,8 +82,8 @@ $date = (string) ($entry['occurred_at_label'] ?? $entry['updated_at'] ?? '');
 
     <div class="nb-peek-grid">
         <div><b>Тип</b>{{ $label !== '' ? $label : '—' }}</div>
+        <div><b>Проект</b>{{ ($entry['project'] ?? '') !== '' ? $entry['project'] : '—' }}</div>
         <div><b>Обновлено</b>{{ $entry['updated_at'] ?? '—' }}</div>
-        <div><b>Источник</b>{{ $entry['source'] ?? '—' }}</div>
         <div><b>Важность</b>{{ $entry['importance'] ?? 0 }}/5</div>
     </div>
 
