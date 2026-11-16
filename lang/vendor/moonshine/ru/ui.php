@@ -48,7 +48,7 @@ return [
         'remember_me' => 'Запомнить меня',
         'login' => 'Войти',
         'logout' => 'Выйти',
-        'username' => 'Имя пользователя',
+        'username' => 'Email',
         'email' => 'E-mail',
         'password' => 'Пароль',
     ],
