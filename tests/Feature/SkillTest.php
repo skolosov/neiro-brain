@@ -121,6 +121,15 @@ class SkillTest extends TestCase
         }
     }
 
+    public function test_help_is_documented_in_both_copies_with_an_alias(): void
+    {
+        foreach (['серверный протокол' => $this->skillText(), 'файл скилла' => $this->installedSkillText()] as $copy => $text) {
+            $this->assertStringContainsString('/brain help', $text, sprintf('%s: нет команды help.', $copy));
+            $this->assertStringContainsString('/brain --help', $text, sprintf('%s: нет алиаса --help.', $copy));
+            $this->assertStringContainsString('/brain compact', $text, sprintf('%s: нет команды compact.', $copy));
+        }
+    }
+
     public function test_command_installs_the_skill_into_the_given_directory(): void
     {
         $root = $this->temporaryDirectory();
