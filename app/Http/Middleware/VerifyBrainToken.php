@@ -11,14 +11,23 @@ use App\Support\OwnerContext;
 use App\Support\OwnerResolver;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Laravel\Mcp\Server\Registrar;
+use Laravel\Passport\Guards\TokenGuard;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Личный токен на входе в MCP и HTTP API.
+ * Вход в MCP и HTTP API: OAuth-токен Passport или личный токен `nb-…`.
  *
- * Токен приходит только в заголовке: `Authorization: Bearer …` или
- * `x-api-key`. Токен в адресе и `X-Neiro-Proxy-Token` больше не принимаются —
- * прокси вырезан, а личность должна быть видна явно.
+ * Токен приходит только в заголовке: `Authorization: Bearer …` или `x-api-key`.
+ * Токен в адресе и `X-Neiro-Proxy-Token` больше не принимаются — прокси вырезан,
+ * а личность должна быть видна явно.
+ *
+ * Сначала пробуем Passport: клиент с OAuth приходит с JWT в `Authorization` и
+ * обязан иметь область `mcp:use`. Владельцем становится `token->user` — та же
+ * личность `users`, что и у личного токена. Если это не JWT (`nb-…` и прочее),
+ * падаем на прежнюю проверку таблицы `api_tokens`: API, CLI и клиенты без OAuth
+ * работают как раньше.
  *
  * `brain.token:mcp` требует способность write (MCP умеет писать),
  * `brain.token:read` — read, `brain.token:write` — write. Право write
@@ -37,12 +46,21 @@ class VerifyBrainToken
             default => 'read',
         };
 
+        // Токен запоминаем до Passport: гард чистит заголовок Authorization,
+        // если токен не подошёл, и повторная проверка `nb-…` иначе не увидит его.
         $plain = $this->providedToken($request);
 
         if ($plain === '') {
             return $this->unauthorized(
-                'Токен не передан. Добавьте личный токен в заголовок Authorization: Bearer … или x-api-key.',
+                'Токен не передан. Добавьте личный токен в заголовок Authorization: Bearer … или x-api-key '
+                .'либо дайте клиенту подключиться по OAuth.',
             );
+        }
+
+        $oauthOwner = $this->oauthOwner($request);
+
+        if ($oauthOwner !== null) {
+            return $this->handleOauthToken($request, $next, $oauthOwner);
         }
 
         if ($this->isDevToken($plain)) {
@@ -68,7 +86,8 @@ class VerifyBrainToken
 
         if ($token === null) {
             return $this->unauthorized(
-                'Токен не подошёл. Проверьте значение или выпустите новый в панели: /admin, раздел «Токены».',
+                'Токен не подошёл. Проверьте значение или выпустите новый в панели: /admin, раздел «Токены». '
+                .'Клиент с OAuth подключается по адресу — без токена в конфиге.',
             );
         }
 
@@ -81,26 +100,74 @@ class VerifyBrainToken
         $owner = $token->user;
 
         if ($owner === null || ! $owner->is_active) {
-            return $this->unauthorized(
-                'Пользователь отключён — токен больше не действует. Обратитесь к администратору.',
-            );
+            return $this->disabledUser();
         }
 
         if (! $token->hasAbility($required)) {
-            return response()->json([
-                'error' => [
-                    'type' => 'authorization_error',
-                    'code' => 'insufficient_ability',
-                    'message' => $required === 'write'
-                        ? 'У токена нет права write: этим токеном можно только читать. Выпустите токен с правом записи в панели.'
-                        : 'У токена нет права read.',
-                ],
-            ], 403);
+            return $this->insufficientAbility($required);
         }
 
         $token->touchLastUsed();
 
         return $this->proceed($request, $next, $owner);
+    }
+
+    /**
+     * OAuth-токен уже проверен Passport (подпись, срок, отзыв). Остаётся
+     * личность, её активность и область доступа.
+     */
+    private function handleOauthToken(Request $request, Closure $next, User $owner): Response
+    {
+        if (! $owner->is_active) {
+            return $this->disabledUser();
+        }
+
+        if (! $owner->tokenCan(Registrar::OAUTH_SCOPE)) {
+            return $this->insufficientScope();
+        }
+
+        return $this->proceed($request, $next, $owner);
+    }
+
+    /**
+     * Владелец из OAuth-токена Passport.
+     *
+     * Пробуем гард `api` только когда в `Authorization` лежит JWT: личные
+     * токены — это `nb-…` без точек, и гонять их через Passport незачем (он бы
+     * ещё и писал warning в лог на каждый запрос). Cookie-аутентификацию тоже
+     * не пускаем: MCP обязан ходить с явным Bearer.
+     */
+    private function oauthOwner(Request $request): ?User
+    {
+        if (config('auth.guards.api.driver') !== 'passport') {
+            return null;
+        }
+
+        if (! $this->looksLikePassportToken(trim((string) $request->bearerToken()))) {
+            return null;
+        }
+
+        $guard = Auth::guard('api');
+
+        if (! $guard instanceof TokenGuard) {
+            return null;
+        }
+
+        // Гард живёт в контейнере и кэширует и запрос, и пользователя. В
+        // долгоживущем процессе (тесты, Octane) это протащило бы личность
+        // прошлого запроса, поэтому проверяем токен заново — именно этого.
+        $guard->setRequest($request)->forgetUser();
+
+        $user = $guard->user();
+
+        return $user instanceof User ? $user : null;
+    }
+
+    private function looksLikePassportToken(string $plain): bool
+    {
+        return $plain !== ''
+            && ! str_starts_with($plain, TokenIssuer::PREFIX)
+            && substr_count($plain, '.') === 2;
     }
 
     /**
@@ -163,5 +230,37 @@ class VerifyBrainToken
                 'message' => $message,
             ],
         ], 401);
+    }
+
+    private function disabledUser(): Response
+    {
+        return $this->unauthorized(
+            'Пользователь отключён — токен больше не действует. Обратитесь к администратору.',
+        );
+    }
+
+    private function insufficientScope(): Response
+    {
+        return response()->json([
+            'error' => [
+                'type' => 'authorization_error',
+                'code' => 'insufficient_scope',
+                'message' => 'У OAuth-токена нет области mcp:use. Подключите клиент заново и подтвердите доступ '
+                    .'в панели: /admin, раздел «Токены», блок «Подключённые приложения».',
+            ],
+        ], 403);
+    }
+
+    private function insufficientAbility(string $required): Response
+    {
+        return response()->json([
+            'error' => [
+                'type' => 'authorization_error',
+                'code' => 'insufficient_ability',
+                'message' => $required === 'write'
+                    ? 'У токена нет права write: этим токеном можно только читать. Выпустите токен с правом записи в панели.'
+                    : 'У токена нет права read.',
+            ],
+        ], 403);
     }
 }

@@ -9,6 +9,7 @@
         "php": "^8.3",
         "laravel/framework": "^13.17",
         "laravel/mcp": "^1.1",
+        "laravel/passport": "^13.10",
         "laravel/tinker": "^3.0",
         "moonshine/moonshine": "^4.21",
         "spatie/laravel-settings": "^3.10",
@@ -40,6 +41,7 @@
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
+            "@php artisan passport:keys --force",
             "@php artisan migrate --force",
             "npm install --ignore-scripts",
             "npm run build"

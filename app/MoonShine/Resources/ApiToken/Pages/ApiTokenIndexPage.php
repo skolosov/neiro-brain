@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources\ApiToken\Pages;
 
+use App\Models\User;
 use App\MoonShine\Resources\ApiToken\ApiTokenResource;
+use App\Services\Auth\OAuthConnections;
 use App\Support\PanelAccess;
 use MoonShine\Contracts\UI\ActionButtonContract;
 use MoonShine\Laravel\Fields\Relationships\BelongsTo;
@@ -45,6 +47,9 @@ class ApiTokenIndexPage extends IndexPage
     /**
      * Плейн-токен живёт только в flash-сессии следующего запроса: показываем его
      * над таблицей один раз и больше никогда — восстановить значение нельзя.
+     *
+     * Рядом — подключённые OAuth-приложения: у них отдельные таблицы Passport,
+     * поэтому отдельный блок, а не строка в списке личных токенов.
      */
     protected function topLayer(): array
     {
@@ -53,20 +58,46 @@ class ApiTokenIndexPage extends IndexPage
             .'Плейн <code>nb-…</code> показывается один раз, в базе лежит только хэш; '
             .'отзыв — кнопка «Отозвать», он действует сразу.</p>');
 
+        $layers = [$hint];
+
         $plain = session('plain_token');
 
-        if (! is_string($plain) || $plain === '') {
-            return [$hint, ...parent::topLayer()];
-        }
-
-        return [
-            $hint,
-            FlexibleRender::make(fn (): string => view('moonshine.brain.token-issued', [
+        if (is_string($plain) && $plain !== '') {
+            $layers[] = FlexibleRender::make(fn (): string => view('moonshine.brain.token-issued', [
                 'plain' => $plain,
                 'name' => (string) session('plain_token_name', ''),
-            ])->render()),
-            ...parent::topLayer(),
-        ];
+            ])->render());
+        }
+
+        $layers[] = FlexibleRender::make(fn (): string => $this->connectedApps());
+
+        return [...$layers, ...parent::topLayer()];
+    }
+
+    /**
+     * Блок «Подключённые приложения»: имя клиента, когда выдан, кнопка отзыва.
+     *
+     * Обычный человек видит свои приложения, администратор — все (тогда в
+     * таблице появляется колонка «Человек»).
+     */
+    private function connectedApps(): string
+    {
+        $showOwner = PanelAccess::isAdmin();
+        $apps = app(OAuthConnections::class)->visible(PanelAccess::ownerId(), $showOwner);
+
+        $ownerNames = $showOwner
+            ? User::query()
+                ->whereKey($apps->pluck('user_id')->filter()->unique()->all())
+                ->pluck('email', 'id')
+                ->all()
+            : [];
+
+        return view('moonshine.brain.connected-apps', [
+            'apps' => $apps,
+            'ownerNames' => $ownerNames,
+            'showOwner' => $showOwner,
+            'status' => session('oauth_status'),
+        ])->render();
     }
 
     /**

@@ -48,6 +48,21 @@ return [
             'driver' => 'session',
             'provider' => 'moonshine',
         ],
+
+        // OAuth-токены Passport: ими ходят MCP-клиенты после согласия в панели.
+        // Провайдер тот же, что у личности: владелец знаний — `users`.
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+        ],
+
+        // Личность согласия OAuth: читает сессию панели, но возвращает человека
+        // `users`. Passport пишет id в oauth-таблицы, а гард `api` читает
+        // `users`, поэтому отдавать ему учётку панели нельзя.
+        'panel' => [
+            'driver' => 'panel-person',
+            'provider' => 'users',
+        ],
     ],
 
     /*

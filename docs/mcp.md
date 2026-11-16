@@ -1,10 +1,57 @@
 # MCP-сервер
 
 Endpoint: `POST /mcp/knowledge` (streamable-http, только HTTP).
-Авторизация: `Authorization: Bearer nb-…` — личный токен из админки
-(раздел «Токены»), способность `write` (она включает `read`).
+Входов два: OAuth-токен Passport (клиент получает его сам после согласия в
+панели) и личный токен `nb-…` из админки (раздел «Токены», способность `write`,
+она включает `read`) — для клиентов без OAuth, API и CLI.
 Владельца middleware берёт из токена; аргументом владелец не передаётся.
 stdio-режима больше нет: он ходил мимо токена, то есть мимо личности.
+
+## Подключение по OAuth
+
+Клиенту с поддержкой OAuth (DeepSeek Harness, Cursor, `mcp-remote`) токен не
+нужен: в конфиге только адрес, без заголовка `Authorization`.
+
+```json
+{
+  "mcpServers": {
+    "neiro-brain": { "url": "http://neiro-brain.local/mcp/knowledge" }
+  }
+}
+```
+
+Что происходит дальше:
+
+1. Первый запрос без токена получает `401` и заголовок
+   `WWW-Authenticate: Bearer realm="mcp", resource_metadata="…/.well-known/oauth-protected-resource/mcp/knowledge"`.
+2. Клиент читает метаданные (RFC 9728 и RFC 8414) — они лежат открыто:
+   `/.well-known/oauth-protected-resource/mcp/knowledge` и
+   `/.well-known/oauth-authorization-server`.
+3. Регистрируется как публичный клиент: `POST /oauth/register`, `client_secret`
+   не выдаётся.
+4. Открывает браузер на `GET /oauth/authorize` с PKCE S256. Если человек ещё не
+   вошёл, его редиректит на `/admin/login`, а после входа MoonShine возвращает к
+   согласию.
+5. Человек видит имя клиента, право `mcp:use` («доступ к вашей базе знаний») и
+   жмёт «Разрешить». Согласие выдаётся в сессии панели: отдельного кабинета нет.
+6. Клиент меняет код на токен — `POST /oauth/token` с
+   `grant_type=authorization_code` и `code_verifier` — и дальше ходит с
+   `Authorization: Bearer <access_token>`.
+
+| Адрес | Что отдаёт |
+|---|---|
+| `/.well-known/oauth-protected-resource/mcp/knowledge` | `resource`, `authorization_servers`, `scopes_supported` |
+| `/.well-known/oauth-authorization-server` | `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `scopes_supported: ["mcp:use"]`, `code_challenge_methods_supported: ["S256"]` |
+
+OAuth-токен принадлежит человеку `users`, поэтому карточки видны только ему.
+Токен без области `mcp:use` получает `403 insufficient_scope`.
+
+Отзыв — в панели, раздел «Токены», блок **«Подключённые приложения»**: имя
+клиента, когда выдан, кнопка «Отозвать». После отзыва следующий запрос получает
+`401`, и клиент просит вход заново.
+
+Клиентам без OAuth остаётся личный токен `nb-…` — как описано в конце раздела
+«Проверка вручную».
 
 ## Инструменты
 
@@ -186,5 +233,6 @@ curl -sS http://neiro-brain.local/mcp/knowledge \
 ```
 
 Коды: `401 invalid_token` — токена нет, он отозван или истёк; `403
-insufficient_ability` — у токена только `read`, а MCP требует `write`; `503
-no_owner` — в базе нет активного пользователя.
+insufficient_ability` — у личного токена только `read`, а MCP требует `write`;
+`403 insufficient_scope` — у OAuth-токена нет области `mcp:use`; `503 no_owner` —
+в базе нет активного пользователя.

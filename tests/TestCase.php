@@ -9,6 +9,7 @@ use App\Settings\SettingsInitializer;
 use App\Support\OwnerContext;
 use DateTimeInterface;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 
@@ -20,6 +21,13 @@ abstract class TestCase extends BaseTestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Passport подписывает OAuth-токены файловыми ключами, а они не в git.
+        // На чистом клоне тесты выпускают их сами, иначе падают с «Key file …
+        // does not exist» ещё до первого assert.
+        if (! is_file(storage_path('oauth-private.key'))) {
+            Artisan::call('passport:keys');
+        }
 
         try {
             if (Schema::hasTable('settings')) {

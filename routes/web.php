@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\BrainAdminController;
+use App\Http\Controllers\Admin\OAuthAppController;
 use App\Http\Controllers\SkillController;
 use App\Http\Middleware\SetOwnerFromPanel;
 use Illuminate\Support\Facades\Route;
@@ -48,4 +49,7 @@ Route::prefix('admin/brain')
         Route::post('/settings', [BrainAdminController::class, 'updateSettings'])->name('settings');
         Route::post('/instruction', [BrainAdminController::class, 'updateInstruction'])->name('instruction');
         Route::post('/instruction/reset', [BrainAdminController::class, 'resetInstruction'])->name('instruction.reset');
+
+        // Отзыв доступа OAuth-приложения: удаление токена Passport.
+        Route::delete('/oauth-tokens/{token}', [OAuthAppController::class, 'destroy'])->name('oauth-tokens.destroy');
     });

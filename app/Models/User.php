@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\Concerns\HasApiTokens;
+use App\Models\Concerns\HasApiTokens as HasPersonalTokens;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -11,14 +11,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\HasApiTokens;
 use MoonShine\Laravel\Models\MoonshineUser;
 
 #[Fillable(['name', 'email', 'password', 'locale', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    /**
+     * Два вида токенов: личные `nb-…` из панели (свой трейт) и OAuth-токены
+     * Passport, которыми клиент ходит после согласия человека. Имена методов у
+     * трейтов разные (`apiTokens()` и `tokens()`), поэтому они не конфликтуют.
+     *
+     * @use HasFactory<UserFactory>
+     */
+    use HasApiTokens, HasFactory, HasPersonalTokens, Notifiable;
 
     /**
      * Get the attributes that should be cast.
