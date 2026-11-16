@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Brain;
 
 use App\Enums\EntryStatus;
+use App\Enums\KnowledgeTheme;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Support\OwnerContext;
@@ -76,7 +77,9 @@ final class KnowledgeWriter
             'summary' => $data->summary !== null ? $this->masker->mask($data->summary)->text : Text::limit($content, 300),
             'details' => $details,
             'project' => $data->project,
-            'theme' => $data->theme,
+            // Новые карточки получают каноническую тему. Старые и TopicMap не
+            // переписываются: у них свои написания, и это осознанная история.
+            'theme' => KnowledgeTheme::normalize($data->theme),
             'scope' => $data->scope->value,
             'tags' => $data->tags,
             'importance' => $data->importance,
@@ -122,6 +125,59 @@ final class KnowledgeWriter
         $this->indexer->index($old);
 
         return $new['entry'];
+    }
+
+    /**
+     * Пометить перечисленные карточки заменёнными только что записанной.
+     *
+     * Так работает слияние дублей: новая карточка остаётся в поиске, старые
+     * уходят в историю. Трогаем только карточки текущего владельца: чужой id
+     * не даёт права подменить карточку. Возвращаем и те id, которые не удалось
+     * принять, чтобы инструмент честно сказал о них в ответе.
+     *
+     * @param  list<int>  $ids
+     * @return array{linked: list<int>, ignored: list<int>}
+     */
+    public function supersedeWith(KnowledgeEntry $new, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            fn (int $id): bool => $id > 0 && $id !== (int) $new->getKey(),
+        )));
+
+        if ($ids === []) {
+            return ['linked' => [], 'ignored' => []];
+        }
+
+        $ownerId = $this->owners->id();
+
+        // Скоуп владельца снят: чужие карточки нужно увидеть, чтобы честно
+        // сообщить о них, а не выдать их за несуществующие. Скоуп актуальности
+        // остаётся: уже заменённую карточку второй раз не перезаменяем.
+        $cards = KnowledgeEntry::query()
+            ->withoutGlobalScope('owner')
+            ->whereIn('id', $ids)
+            ->get();
+
+        $linked = [];
+        $ignored = [];
+
+        foreach ($cards as $old) {
+            if ((int) $old->owner_id !== $ownerId) {
+                $ignored[] = (int) $old->getKey();
+
+                continue;
+            }
+
+            $old->forceFill(['superseded_by' => $new->getKey()])->save();
+            $this->indexer->index($old);
+            $linked[] = (int) $old->getKey();
+        }
+
+        $found = $cards->map(fn (KnowledgeEntry $entry): int => (int) $entry->getKey())->all();
+        $ignored = array_values(array_unique([...$ignored, ...array_diff($ids, $found)]));
+
+        return ['linked' => $linked, 'ignored' => $ignored];
     }
 
     /**

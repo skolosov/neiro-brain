@@ -7,6 +7,7 @@ namespace App\MoonShine\Resources\KnowledgeEntry\Pages;
 use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
 use App\Enums\KnowledgeScope;
+use App\Enums\KnowledgeTheme;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
 use MoonShine\Contracts\Core\TypeCasts\DataWrapperContract;
 use MoonShine\Laravel\Pages\Crud\FormPage;
@@ -38,7 +39,8 @@ class KnowledgeEntryFormPage extends FormPage
                     ->attach(EntryStatus::class)
                     ->required(),
                 Text::make('Проект', 'project'),
-                Text::make('Тема', 'theme'),
+                Text::make('Тема', 'theme')
+                    ->hint('Канонические темы: '.implode(', ', KnowledgeTheme::values()).'. Незнакомая тема сохранится как other.'),
                 Number::make('Важность', 'importance')
                     ->min(1)
                     ->max(5)

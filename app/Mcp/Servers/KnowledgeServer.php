@@ -7,25 +7,24 @@ namespace App\Mcp\Servers;
 use App\Mcp\Prompts\AboutMePrompt;
 use App\Mcp\Resources\KnowledgeEntryResource;
 use App\Mcp\Resources\KnowledgeIndexResource;
+use App\Mcp\Resources\SkillResource;
 use App\Mcp\Tools\DeleteKnowledgeTool;
 use App\Mcp\Tools\GetKnowledgeTool;
 use App\Mcp\Tools\ListProjectsTool;
 use App\Mcp\Tools\ProjectContextTool;
 use App\Mcp\Tools\RecentKnowledgeTool;
-use App\Mcp\Tools\RememberKnowledgeTool;
+use App\Mcp\Tools\RememberManyTool;
 use App\Mcp\Tools\SearchKnowledgeTool;
-use App\Support\OwnerContext;
-use App\Support\OwnerResolver;
+use App\Services\Brain\InstructionsBuilder;
 use Laravel\Mcp\Server;
-use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
 
 #[Name('neiro-brain')]
 #[Version('1.0.0')]
-#[Instructions('Личная база знаний пользователя. Перед вопросами о пользователе, его компании, проектах, стеке, предпочтениях и прошлых решениях вызывай search_knowledge. Используй get_knowledge для полного текста, remember_knowledge — когда просят запомнить (укажи scope: profile, environment или project), delete_knowledge — когда просят убрать карточку.')]
 class KnowledgeServer extends Server
 {
     /**
@@ -35,7 +34,7 @@ class KnowledgeServer extends Server
         ProjectContextTool::class,
         SearchKnowledgeTool::class,
         GetKnowledgeTool::class,
-        RememberKnowledgeTool::class,
+        RememberManyTool::class,
         DeleteKnowledgeTool::class,
         ListProjectsTool::class,
         RecentKnowledgeTool::class,
@@ -47,6 +46,7 @@ class KnowledgeServer extends Server
     protected array $resources = [
         KnowledgeIndexResource::class,
         KnowledgeEntryResource::class,
+        SkillResource::class,
     ];
 
     /**
@@ -57,22 +57,15 @@ class KnowledgeServer extends Server
     ];
 
     /**
-     * Локальный MCP (`php artisan mcp:start knowledge`) не проходит через
-     * HTTP-middleware, поэтому владельца ставим здесь. Для веб-входа контекст
-     * уже выставлен VerifyBrainToken, и этот код ничего не меняет.
+     * Текст правил собирается на каждый запрос: имя, язык и проекты зависят от
+     * владельца из токена. Атрибут `#[Instructions]` здесь не используется —
+     * единственный источник текста это InstructionsBuilder.
      */
-    protected function boot(): void
+    public function createContext(): ServerContext
     {
-        $context = app(OwnerContext::class);
+        $context = parent::createContext();
+        $context->instructions = app(InstructionsBuilder::class)->build();
 
-        if ($context->has()) {
-            return;
-        }
-
-        $owner = app(OwnerResolver::class)->resolve();
-
-        if ($owner !== null) {
-            $context->set($owner);
-        }
+        return $context;
     }
 }

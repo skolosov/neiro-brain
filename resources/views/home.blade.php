@@ -34,7 +34,7 @@
     </p>
 
     <div class="grid">
-        <div class="card"><b>1. Подключите MCP</b><br>Сервер <code>{{ url('/mcp/knowledge') }}</code> отдаёт search_knowledge, get_knowledge, remember_knowledge и others.</div>
+        <div class="card"><b>1. Подключите MCP</b><br>Сервер <code>{{ url('/mcp/knowledge') }}</code> отдаёт search_knowledge, get_knowledge, remember_many и others.</div>
         <div class="card"><b>2. Пишите через API</b><br>Эндпоинт <code>{{ url('/api/v1') }}</code> принимает карточки и отдаёт поиск тем же токеном.</div>
         <div class="card"><b>3. Смотрите знания</b><br>Админка MoonShine: чтение, ручное редактирование, статусы и темы.</div>
     </div>

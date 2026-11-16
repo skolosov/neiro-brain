@@ -9,11 +9,10 @@ use Laravel\Mcp\Facades\Mcp;
 |--------------------------------------------------------------------------
 |
 | Web server: POST /mcp/knowledge (personal token from /app/tokens).
-| Local server: `php artisan mcp:start knowledge` for stdio-based harnesses.
+| Локального stdio-сервера больше нет: он ходил мимо токена, то есть мимо
+| личности, и записывал знания случайному владельцу.
 |
 */
 
 Mcp::web('/mcp/knowledge', KnowledgeServer::class)
     ->middleware('brain.token:mcp');
-
-Mcp::local('knowledge', KnowledgeServer::class);
