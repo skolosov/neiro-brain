@@ -9,8 +9,6 @@ use App\MoonShine\Pages\ProjectsPage;
 use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
-use App\MoonShine\Resources\KnowledgeSource\KnowledgeSourceResource;
-use App\MoonShine\Resources\SearchLog\SearchLogResource;
 use MoonShine\ColorManager\ColorManager;
 use MoonShine\ColorManager\Palettes\PurplePalette;
 use MoonShine\Contracts\ColorManager\ColorManagerContract;
@@ -42,8 +40,6 @@ final class MoonShineLayout extends AppLayout
                 MenuItem::make(GraphPage::class, 'Граф', 'share'),
                 MenuItem::make(ProjectsPage::class, 'Проекты', 'folder'),
                 MenuItem::make(KnowledgeEntryResource::class, 'Знания', 'book-open'),
-                MenuItem::make(KnowledgeSourceResource::class, 'Источники', 'circle-stack'),
-                MenuItem::make(SearchLogResource::class, 'Поисковые запросы', 'magnifying-glass'),
                 MenuItem::make(SettingsPage::class, 'Настройки', 'cog-6-tooth'),
             ], 'book-open'),
         ];

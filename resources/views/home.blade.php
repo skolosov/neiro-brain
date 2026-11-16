@@ -25,18 +25,18 @@
 </head>
 <body>
 <div class="wrap">
-    <div class="kicker">BM25 · MCP · Laravel AI SDK</div>
+    <div class="kicker">BM25 · MCP · Laravel</div>
     <h1>Neiro Brain<br><span>второй мозг для LLM</span></h1>
     <p>
-        Прозрачный прокси записывает переписку с любым харнессом, суммирует её в атомарные знания
-        и отдаёт их обратно через MCP. Поиск работает на Okapi BM25 с русской и английской морфологией,
+        База знаний принимает факты через MCP и HTTP API, раскладывает их по карточкам
+        и отдаёт моделям. Поиск работает на Okapi BM25 с русской и английской морфологией,
         поэтому модели не нужен векторный индекс, чтобы вспомнить ваш стек, проекты и решения.
     </p>
 
     <div class="grid">
-        <div class="card"><b>1. Подключите прокси</b><br>Замените base URL на <code>{{ url('/v1') }}</code> — OpenAI- и Anthropic-клиенты работают без изменений.</div>
-        <div class="card"><b>2. Подключите MCP</b><br>Сервер <code>{{ url('/mcp/knowledge') }}</code> отдаёт search_knowledge, get_knowledge, remember_knowledge и others.</div>
-        <div class="card"><b>3. Смотрите знания</b><br>Админка MoonShine: чтение, ручное редактирование, статусы, источники и журнал поисковых запросов.</div>
+        <div class="card"><b>1. Подключите MCP</b><br>Сервер <code>{{ url('/mcp/knowledge') }}</code> отдаёт search_knowledge, get_knowledge, remember_knowledge и others.</div>
+        <div class="card"><b>2. Пишите через API</b><br>Эндпоинт <code>{{ url('/api/v1') }}</code> принимает карточки и отдаёт поиск тем же токеном.</div>
+        <div class="card"><b>3. Смотрите знания</b><br>Админка MoonShine: чтение, ручное редактирование, статусы и темы.</div>
     </div>
 
     <div class="actions">
@@ -45,7 +45,7 @@
     </div>
 
     <footer>
-        Каждые 15 минут: ingest → summarize → reindex. Секреты вырезаются до записи в базу.
+        Знания пишутся только через MCP и API. Секреты вырезаются до записи в базу.
     </footer>
 </div>
 </body>

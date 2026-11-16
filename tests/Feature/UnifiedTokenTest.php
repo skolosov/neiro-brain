@@ -9,8 +9,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Токен один: настройка security.access_token. Прокси, MCP и API проверяют
- * одно и то же значение, поэтому любой из трёх входов должен принимать его.
+ * Токен один: настройка security.access_token. MCP и API проверяют одно и то
+ * же значение, поэтому любой из двух входов должен принимать его.
  */
 class UnifiedTokenTest extends TestCase
 {
@@ -25,13 +25,6 @@ class UnifiedTokenTest extends TestCase
         $security = app(SecuritySettings::class);
         $security->access_token = self::TOKEN;
         $security->save();
-    }
-
-    public function test_token_authorizes_the_proxy(): void
-    {
-        $this->withHeaders(['x-api-key' => self::TOKEN])
-            ->getJson('/v1/models')
-            ->assertOk();
     }
 
     public function test_token_authorizes_the_api(): void
@@ -54,17 +47,8 @@ class UnifiedTokenTest extends TestCase
         ])->assertSuccessful();
     }
 
-    public function test_token_in_the_address_works_for_the_proxy(): void
-    {
-        $this->getJson('/'.self::TOKEN.'/v1/models')->assertOk();
-    }
-
     public function test_unknown_token_is_rejected(): void
     {
-        $this->withHeaders(['Authorization' => 'Bearer not-a-token'])
-            ->getJson('/v1/models')
-            ->assertUnauthorized();
-
         $this->withHeaders(['Authorization' => 'Bearer not-a-token'])
             ->getJson('/api/v1/stats')
             ->assertUnauthorized();

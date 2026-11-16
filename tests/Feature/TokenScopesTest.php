@@ -37,15 +37,11 @@ class TokenScopesTest extends TestCase
         $this->assertStringStartsWith('nb-', $after);
     }
 
-    public function test_generated_token_authorizes_every_channel(): void
+    public function test_generated_token_authorizes_mcp_and_api(): void
     {
         $this->artisan('brain:token --generate')->assertSuccessful();
 
         $token = app(SecuritySettings::class)->refresh()->access_token;
-
-        $this->withHeaders(['x-api-key' => $token])
-            ->getJson('/v1/models')
-            ->assertOk();
 
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/v1/stats')
@@ -65,14 +61,6 @@ class TokenScopesTest extends TestCase
                 'Accept' => 'application/json, text/event-stream',
             ])
             ->postJson('/mcp/knowledge', self::MCP_INITIALIZE)
-            ->assertUnauthorized();
-    }
-
-    public function test_shipped_default_token_is_rejected_for_the_proxy_from_a_public_address(): void
-    {
-        $this->withServerVariables(['REMOTE_ADDR' => '8.8.8.8'])
-            ->withHeaders(['x-api-key' => 'dev-brain-token'])
-            ->getJson('/v1/models')
             ->assertUnauthorized();
     }
 

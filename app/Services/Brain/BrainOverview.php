@@ -4,14 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Brain;
 
-use App\Enums\ConversationStatus;
 use App\Enums\EntryStatus;
-use App\Models\Conversation;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeSource;
-use App\Models\SearchLog;
-use App\Models\SyncRun;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -50,22 +45,12 @@ final class BrainOverview
             'projects' => (clone $published)->whereNotNull('project')->where('project', '!=', '')->distinct('project')->count('project'),
             'topics' => $this->topics->counts(12),
             'chunks' => KnowledgeChunk::query()->count(),
-            'conversations' => Conversation::query()->count(),
-            'pending' => Conversation::query()->where('status', ConversationStatus::Pending->value)->count(),
-            'summarized' => Conversation::query()->where('status', ConversationStatus::Summarized->value)->count(),
-            'searches24h' => SearchLog::query()->where('created_at', '>=', now()->subDay())->count(),
-            'lastRun' => SyncRun::query()->latest('id')->first(),
             'series' => $this->series(),
             'projectsCards' => $this->projectCards(),
-            'sources' => $this->sources(),
             'recent' => KnowledgeEntry::query()
                 ->approved()
                 ->orderByDesc('updated_at')
                 ->limit(6)
-                ->get(),
-            'recentSearches' => SearchLog::query()
-                ->orderByDesc('id')
-                ->limit(8)
                 ->get(),
         ];
     }
@@ -143,29 +128,5 @@ final class BrainOverview
             ->sortByDesc('count')
             ->take($limit)
             ->values();
-    }
-
-    /**
-     * Source health: how many conversations each source produced and whether it
-     * errors out.
-     *
-     * @return Collection<int, array<string, mixed>>
-     */
-    public function sources(): Collection
-    {
-        return KnowledgeSource::query()
-            ->withCount('conversations')
-            ->orderBy('name')
-            ->get()
-            ->map(fn (KnowledgeSource $source): array => [
-                'name' => (string) $source->name,
-                'slug' => (string) $source->slug,
-                'type' => $source->type instanceof \BackedEnum ? (string) $source->type->value : (string) $source->type,
-                'enabled' => (bool) $source->enabled,
-                'conversations' => (int) $source->conversations_count,
-                'cards' => KnowledgeEntry::query()->where('source_id', $source->id)->count(),
-                'last_synced_at' => $source->last_synced_at,
-                'error' => $source->last_error,
-            ]);
     }
 }

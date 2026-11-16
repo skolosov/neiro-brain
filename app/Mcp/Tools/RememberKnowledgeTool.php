@@ -9,7 +9,6 @@ use App\Enums\KnowledgeKind;
 use App\Enums\KnowledgeScope;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
@@ -28,7 +27,6 @@ class RememberKnowledgeTool extends Tool
 {
     public function __construct(
         private readonly KnowledgeWriter $writer,
-        private readonly SourceRegistry $sources,
     ) {}
 
     public function handle(Request $request): Response
@@ -69,9 +67,8 @@ class RememberKnowledgeTool extends Tool
                 importance: (int) ($validated['importance'] ?? 3),
                 confidence: 1.0,
             ),
-            source: $this->sources->manual(),
-            status: EntryStatus::Approved,
-            metadata: ['engine' => 'mcp'],
+            EntryStatus::Approved,
+            ['engine' => 'mcp'],
         );
 
         if ($result === null) {

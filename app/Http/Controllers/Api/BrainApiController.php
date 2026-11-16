@@ -6,18 +6,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
-use App\Enums\SourceType;
 use App\Http\Controllers\Controller;
-use App\Models\Conversation;
 use App\Models\KnowledgeEntry;
-use App\Models\SearchLog;
-use App\Services\Brain\ConversationIngestor;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\KnowledgeSearch;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
-use App\Services\SummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,54 +20,9 @@ use Illuminate\Validation\Rule;
 class BrainApiController extends Controller
 {
     public function __construct(
-        private readonly SourceRegistry $sources,
-        private readonly ConversationIngestor $ingestor,
         private readonly KnowledgeSearch $search,
         private readonly KnowledgeWriter $writer,
-        private readonly SummaryService $summaries,
     ) {}
-
-    public function ingest(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'external_id' => ['required', 'string', 'max:190'],
-            'title' => ['nullable', 'string', 'max:255'],
-            'project' => ['nullable', 'string', 'max:128'],
-            'harness' => ['nullable', 'string', 'max:64'],
-            'metadata' => ['nullable', 'array'],
-            'summarize' => ['nullable', 'boolean'],
-            'messages' => ['required', 'array', 'min:1'],
-            'messages.*.role' => ['required', 'string', Rule::in(['user', 'assistant', 'system', 'tool'])],
-            'messages.*.content' => ['required', 'string'],
-            'messages.*.occurred_at' => ['nullable', 'date'],
-        ]);
-
-        $source = $this->sources->forSlug('api', 'Ingestion API', SourceType::Api);
-        $result = $this->ingestor->ingest(
-            $source,
-            $validated['external_id'],
-            $validated['messages'],
-            [
-                'title' => $validated['title'] ?? null,
-                'project' => $validated['project'] ?? null,
-                'harness' => $validated['harness'] ?? 'api',
-                'metadata' => $validated['metadata'] ?? null,
-            ],
-        );
-
-        $summary = null;
-
-        if (($validated['summarize'] ?? false) === true) {
-            $summary = $this->summaries->summarize($result['conversation'], force: true);
-        }
-
-        return response()->json([
-            'conversation_id' => $result['conversation']->id,
-            'messages_added' => $result['added'],
-            'status' => $result['conversation']->status->value,
-            'summary' => $summary,
-        ], 201);
-    }
 
     public function search(Request $request): JsonResponse
     {
@@ -90,7 +39,7 @@ class BrainApiController extends Controller
             project: $validated['project'] ?? null,
             kinds: $validated['kinds'] ?? [],
             limit: (int) ($validated['limit'] ?? 8),
-        ), 'api');
+        ));
 
         return response()->json([
             'data' => $result->toArray(),
@@ -132,9 +81,8 @@ class BrainApiController extends Controller
                 importance: (int) ($validated['importance'] ?? 3),
                 confidence: 1.0,
             ),
-            source: $this->sources->manual(),
-            status: EntryStatus::tryFrom($validated['status'] ?? 'approved') ?? EntryStatus::Approved,
-            metadata: ['engine' => 'api'],
+            EntryStatus::tryFrom($validated['status'] ?? 'approved') ?? EntryStatus::Approved,
+            ['engine' => 'api'],
         );
 
         if ($result === null) {
@@ -167,8 +115,6 @@ class BrainApiController extends Controller
             'data' => [
                 'entries' => KnowledgeEntry::query()->approved()->count(),
                 'drafts' => KnowledgeEntry::query()->where('status', 'draft')->count(),
-                'conversations' => Conversation::query()->count(),
-                'searches' => SearchLog::query()->count(),
             ],
         ]);
     }

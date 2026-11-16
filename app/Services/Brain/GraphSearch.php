@@ -29,11 +29,10 @@ final class GraphSearch
     /**
      * @return array{result: SearchResult, graph: GraphData, focus: list<string>}
      */
-    public function search(string $query, ?string $project = null, int $limit = 8, int $nodes = 400, string $source = 'admin'): array
+    public function search(string $query, ?string $project = null, int $limit = 8, int $nodes = 400): array
     {
         $result = $this->search->search(
             new SearchQuery(query: $query, project: $project, limit: $limit),
-            $source,
         );
 
         $built = $this->graph->build($nodes, 'all', $project);

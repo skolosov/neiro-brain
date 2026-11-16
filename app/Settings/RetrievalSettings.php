@@ -33,8 +33,6 @@ class RetrievalSettings extends Settings
 
     public bool $include_drafts = false;
 
-    public bool $log_searches = true;
-
     /** @var array<string, float> */
     public array $kind_weights = [
         'profile' => 1.25,

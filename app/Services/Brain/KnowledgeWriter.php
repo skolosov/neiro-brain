@@ -5,17 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Brain;
 
 use App\Enums\EntryStatus;
-use App\Models\Conversation;
 use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeSource;
 use App\Services\Brain\Dto\ExtractedEntry;
-use App\Settings\SyncSettings;
 
 final class KnowledgeWriter
 {
     public function __construct(
         private readonly SecretMasker $masker,
-        private readonly SyncSettings $syncSettings,
         private readonly Indexer $indexer,
     ) {}
 
@@ -25,8 +21,6 @@ final class KnowledgeWriter
      */
     public function write(
         ExtractedEntry $data,
-        ?Conversation $conversation = null,
-        ?KnowledgeSource $source = null,
         ?EntryStatus $status = null,
         array $metadata = [],
     ): ?array {
@@ -62,10 +56,8 @@ final class KnowledgeWriter
         }
 
         $entry = KnowledgeEntry::query()->create([
-            'source_id' => $source?->id ?? $conversation?->source_id,
-            'conversation_id' => $conversation?->id,
             'kind' => $data->kind->value,
-            'status' => ($status ?? ($this->syncSettings->auto_approve ? EntryStatus::Approved : EntryStatus::Draft))->value,
+            'status' => ($status ?? EntryStatus::Approved)->value,
             'title' => $title,
             'content' => $content,
             'summary' => $data->summary !== null ? $this->masker->mask($data->summary)->text : Text::limit($content, 300),
@@ -78,11 +70,10 @@ final class KnowledgeWriter
             'confidence' => $data->confidence,
             'language' => $this->language($content),
             'content_hash' => $hash,
-            'occurred_at' => $conversation?->last_activity_at ?? now(),
+            'occurred_at' => now(),
             'last_verified_at' => now(),
             'metadata' => array_filter([
                 'engine' => $metadata['engine'] ?? null,
-                'conversation_external_id' => $conversation?->external_id,
             ]),
         ]);
 
@@ -100,10 +91,9 @@ final class KnowledgeWriter
     public function supersede(
         KnowledgeEntry $old,
         ExtractedEntry $data,
-        ?KnowledgeSource $source = null,
         array $metadata = [],
     ): KnowledgeEntry {
-        $new = $this->write($data, null, $source ?? $old->source, null, $metadata);
+        $new = $this->write($data, null, $metadata);
 
         if ($new === null) {
             return $old;
@@ -122,15 +112,13 @@ final class KnowledgeWriter
      */
     public function writeMany(
         array $data,
-        ?Conversation $conversation = null,
-        ?KnowledgeSource $source = null,
         array $metadata = [],
     ): array {
         $created = 0;
         $updated = 0;
 
         foreach ($data as $item) {
-            $result = $this->write($item, $conversation, $source, null, $metadata);
+            $result = $this->write($item, null, $metadata);
 
             if ($result === null) {
                 continue;

@@ -19,10 +19,6 @@
         </div>
         <div class="nb-actions">
             <a href="{{ $searchUrl }}" class="nb-btn nb-btn-secondary">К карточкам</a>
-            <form method="POST" action="{{ route('brain.admin.sync') }}">
-                @csrf
-                <button type="submit" class="nb-btn nb-btn-primary">Синхронизировать</button>
-            </form>
         </div>
     </div>
 

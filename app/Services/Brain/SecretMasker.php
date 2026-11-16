@@ -10,8 +10,8 @@ use App\Settings\SecuritySettings;
 /**
  * Removes credentials from text before it reaches the knowledge base.
  *
- * Masking happens on ingestion and again before saving AI output, because a
- * model can repeat a secret it saw in the transcript.
+ * Masking happens on every write — MCP tool, HTTP API and the admin panel —
+ * before the text reaches the knowledge base.
  */
 final class SecretMasker
 {

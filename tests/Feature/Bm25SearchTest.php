@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\KnowledgeSearch;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
 use App\Settings\RetrievalSettings;
-use App\Settings\SyncSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -30,7 +29,6 @@ class Bm25SearchTest extends TestCase
                 importance: $importance,
                 confidence: 1.0,
             ),
-            source: app(SourceRegistry::class)->manual(),
         );
 
         return $result['entry']->id;
@@ -41,7 +39,7 @@ class Bm25SearchTest extends TestCase
         $rare = $this->write('Борщ', 'Классический борщ со свёклой и капустой.');
         $common = $this->write('Приготовление', 'Как приготовить простое блюдо на ужин. Приготовить быстро.');
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('приготовить борщ'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('приготовить борщ'));
 
         $this->assertNotEmpty($result->hits);
         $this->assertSame($rare, $result->hits[0]->entry->id);
@@ -53,7 +51,7 @@ class Bm25SearchTest extends TestCase
         $short = $this->write('Коротко', 'Laravel.');
         $long = $this->write('Длинно', 'Laravel. '.str_repeat('Посторонний текст без ключевых слов. ', 80));
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'));
 
         $this->assertSame($short, $result->hits[0]->entry->id);
         $this->assertNotSame($long, $result->hits[0]->entry->id);
@@ -64,7 +62,7 @@ class Bm25SearchTest extends TestCase
         $this->write('Sklad stack', 'Laravel PostgreSQL Redis', 'Sklad');
         $this->write('CRM stack', 'Laravel PostgreSQL Inertia', 'CRM');
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel', project: 'Sklad'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel', project: 'Sklad'));
 
         $this->assertCount(1, $result->hits);
         $this->assertSame('Sklad', $result->hits[0]->entry->project);
@@ -72,24 +70,20 @@ class Bm25SearchTest extends TestCase
 
     public function test_drafts_are_excluded_by_default(): void
     {
-        $sync = app(SyncSettings::class);
-        $sync->auto_approve = false;
-        $sync->save();
-
         app(KnowledgeWriter::class)->write(
             new ExtractedEntry(
                 kind: KnowledgeKind::Fact,
                 title: 'Черновик',
                 content: 'Уникальное слово черновик',
             ),
-            source: app(SourceRegistry::class)->manual(),
+            EntryStatus::Draft,
         );
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик'));
 
         $this->assertTrue($result->isEmpty());
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик', includeDrafts: true), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик', includeDrafts: true));
         $this->assertFalse($result->isEmpty());
     }
 
@@ -97,7 +91,7 @@ class Bm25SearchTest extends TestCase
     {
         $id = $this->write('Стек', 'Мы используем Laravel и PostgreSQL для проектов.');
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('проекта Laravel'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('проекта Laravel'));
 
         $this->assertSame($id, $result->hits[0]->entry->id ?? null);
     }
@@ -111,7 +105,7 @@ class Bm25SearchTest extends TestCase
 
         $this->write('Настройка', 'Laravel настраиваемый поиск');
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'), 'test');
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('Laravel'));
 
         $this->assertNotEmpty($result->hits);
     }

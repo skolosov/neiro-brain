@@ -18,10 +18,6 @@
         </div>
         <div class="nb-actions">
             <a href="{{ $graphUrl }}" class="nb-btn nb-btn-primary">Граф</a>
-            <form method="POST" action="{{ route('brain.admin.sync') }}">
-                @csrf
-                <button type="submit" class="nb-btn nb-btn-secondary">Синхронизировать</button>
-            </form>
         </div>
     </div>
 

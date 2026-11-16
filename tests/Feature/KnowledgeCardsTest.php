@@ -9,9 +9,7 @@ use App\Models\KnowledgeEntry;
 use App\Services\Brain\BrainGraph;
 use App\Services\Brain\CardSearch;
 use App\Services\Brain\Dto\ExtractedEntry;
-use App\Services\Brain\EntryQuality;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
 use App\Services\Brain\TopicMap;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
@@ -52,81 +50,7 @@ class KnowledgeCardsTest extends TestCase
                 importance: $importance,
                 confidence: 1.0,
             ),
-            source: app(SourceRegistry::class)->manual(),
         )['entry'];
-    }
-
-    public function test_quality_filter_drops_task_restatements_and_questions(): void
-    {
-        $quality = app(EntryQuality::class);
-
-        $good = new ExtractedEntry(
-            kind: KnowledgeKind::Preference,
-            title: 'Модульный монолит',
-            content: 'Пользователь предпочитает модульный монолит вместо микросервисов в маленькой команде.',
-            importance: 4,
-            confidence: 0.9,
-        );
-
-        $task = new ExtractedEntry(
-            kind: KnowledgeKind::Fact,
-            title: 'Распознать девять видео',
-            content: 'Пользователь попросил распознать девять видео из папки Movies и перевести речь в текст.',
-            importance: 3,
-            confidence: 0.9,
-        );
-
-        $question = new ExtractedEntry(
-            kind: KnowledgeKind::Fact,
-            title: 'Вопрос про очередь',
-            content: 'Стоит ли переводить очередь на database драйвер в этом проекте, ведь нагрузка растёт?',
-            importance: 3,
-            confidence: 0.8,
-        );
-
-        $noise = new ExtractedEntry(
-            kind: KnowledgeKind::Other,
-            title: 'Короткая реплика',
-            content: 'Спасибо, всё получилось.',
-            importance: 2,
-            confidence: 0.5,
-        );
-
-        $this->assertNull($quality->reason($good));
-        $this->assertSame('task', $quality->reason($task));
-        $this->assertSame('question', $quality->reason($question));
-        $this->assertSame('too_short', $quality->reason($noise));
-
-        $filtered = $quality->filter([$good, $task, $question, $noise]);
-
-        $this->assertCount(1, $filtered['entries']);
-        $this->assertSame(3, array_sum($filtered['dropped']));
-    }
-
-    public function test_quality_filter_deduplicates_identical_entries(): void
-    {
-        $quality = app(EntryQuality::class);
-
-        $first = new ExtractedEntry(
-            kind: KnowledgeKind::Stack,
-            title: 'Основной стек',
-            content: 'Пользователь работает на Laravel 13 и PostgreSQL в локальном OpenServer.',
-            importance: 4,
-            confidence: 0.9,
-        );
-
-        $second = new ExtractedEntry(
-            kind: KnowledgeKind::Stack,
-            title: 'Основной стек',
-            content: 'Пользователь работает на Laravel 13 и PostgreSQL в локальном OpenServer.',
-            importance: 4,
-            confidence: 0.9,
-        );
-
-        $filtered = $quality->filter([$first, $second]);
-
-        $this->assertCount(1, $filtered['entries']);
-        $this->assertSame(1, $filtered['dropped']['duplicate']);
     }
 
     public function test_topics_are_derived_from_tags_and_kind(): void
@@ -276,7 +200,7 @@ class KnowledgeCardsTest extends TestCase
             ->assertOk()
             ->assertSee('Что лежит в базе')
             ->assertSee('Темы')
-            ->assertSee('Здоровье источников');
+            ->assertSee('Чанков');
 
         $this->actingAs($admin, 'moonshine')
             ->get(route('moonshine.page', ['pageUri' => 'projects-page']))

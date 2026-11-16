@@ -11,18 +11,9 @@
             <h1 class="nb-title">Что лежит в базе</h1>
             <p class="nb-subtitle">
                 Карточек: {{ $total }} · в индексе BM25: {{ $indexed }} из {{ $approved }}
-                @if ($lastRun)
-                    · последняя синхронизация {{ $lastRun->finished_at?->diffForHumans() ?? 'идёт' }}
-                @else
-                    · синхронизация ещё не запускалась
-                @endif
             </p>
         </div>
         <div class="nb-actions">
-            <form method="POST" action="{{ route('brain.admin.sync') }}">
-                @csrf
-                <button type="submit" class="nb-btn nb-btn-primary">Синхронизировать</button>
-            </form>
             <a href="{{ $searchUrl }}" class="nb-btn nb-btn-secondary">Карточки</a>
             <a href="{{ $graphUrl }}" class="nb-btn nb-btn-secondary">Граф</a>
         </div>
@@ -42,12 +33,12 @@
         <div class="nb-card">
             <div class="nb-metric-label">Тем</div>
             <div class="nb-metric-value">{{ $topics->count() }}</div>
-            <div class="nb-metric-hint">{{ $chunks }} чанков в индексе</div>
+            <div class="nb-metric-hint">сгруппированы по смыслу</div>
         </div>
         <div class="nb-card">
-            <div class="nb-metric-label">Очередь</div>
-            <div class="nb-metric-value">{{ $pending }}</div>
-            <div class="nb-metric-hint">{{ $summarized }} диалогов уже пересказано</div>
+            <div class="nb-metric-label">Чанков</div>
+            <div class="nb-metric-value">{{ $chunks }}</div>
+            <div class="nb-metric-hint">по ним ищет BM25</div>
         </div>
     </div>
 
@@ -79,7 +70,7 @@
                     <span class="nb-topic-count">{{ $count }}</span>
                 </a>
             @empty
-                <p class="nb-empty">Тем пока нет: запустите синхронизацию или добавьте карточку.</p>
+                <p class="nb-empty">Тем пока нет: добавьте карточку через MCP, API или админку.</p>
             @endforelse
         </div>
     </div>
@@ -105,57 +96,7 @@
                 @endif
             </div>
         @empty
-            <p class="nb-empty">Пока пусто. Пропустите диалог через прокси — карточки появятся после синхронизации.</p>
-        @endforelse
-    </div>
-
-    <div class="nb-card">
-        <div class="nb-card-head">
-            <h2 class="nb-section-title">Здоровье источников</h2>
-            <a href="{{ route('moonshine.resource.page', ['resourceUri' => 'knowledge-source-resource', 'pageUri' => 'knowledge-source-index-page']) }}">Источники →</a>
-        </div>
-        <div class="nb-table">
-            <div class="nb-table-row nb-table-head">
-                <span>Источник</span>
-                <span>Диалогов</span>
-                <span>Карточек</span>
-                <span>Синхронизация</span>
-            </div>
-            @foreach ($sources as $source)
-                <div class="nb-table-row">
-                    <span>
-                        <span class="nb-status-dot {{ $source['error'] ? 'nb-status-error' : ($source['enabled'] ? 'nb-status-ok' : '') }}"></span>
-                        {{ $source['name'] }}
-                        <span class="nb-meta">{{ $source['type'] }}</span>
-                    </span>
-                    <span>{{ $source['conversations'] }}</span>
-                    <span>{{ $source['cards'] }}</span>
-                    <span class="nb-meta">
-                        @if ($source['error'])
-                            {{ \Illuminate\Support\Str::limit($source['error'], 60) }}
-                        @elseif ($source['last_synced_at'])
-                            {{ $source['last_synced_at']->diffForHumans() }}
-                        @else
-                            ещё не было
-                        @endif
-                    </span>
-                </div>
-            @endforeach
-        </div>
-    </div>
-
-    <div class="nb-card">
-        <div class="nb-card-head">
-            <h2 class="nb-section-title">Последние поиски</h2>
-            <a href="{{ route('moonshine.resource.page', ['resourceUri' => 'search-log-resource', 'pageUri' => 'search-log-index-page']) }}">Журнал →</a>
-        </div>
-        @forelse ($recentSearches as $search)
-            <div class="nb-row">
-                <div class="nb-row-title">{{ $search->query }}</div>
-                <span class="nb-meta">{{ $search->source }} · {{ $search->results_count }} · {{ $search->latency_ms }} мс</span>
-            </div>
-        @empty
-            <p class="nb-empty">Пока никто не искал.</p>
+            <p class="nb-empty">Пока пусто. Добавьте карточку через MCP или API — она появится здесь.</p>
         @endforelse
     </div>
 </div>

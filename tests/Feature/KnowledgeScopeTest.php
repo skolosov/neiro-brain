@@ -10,7 +10,6 @@ use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Services\Brain\ProjectContext;
-use App\Services\Brain\SourceRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -46,7 +45,6 @@ class KnowledgeScopeTest extends TestCase
                 scope: $scope,
                 confidence: 1.0,
             ),
-            source: app(SourceRegistry::class)->manual(),
         )['entry'];
     }
 

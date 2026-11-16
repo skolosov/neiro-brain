@@ -23,8 +23,8 @@ use Illuminate\Support\Collection;
  *     every project, so a chat about dCell must see them even though they were
  *     learned in a chat about SMSGateway.
  *
- * This is deliberately separate from ContextBuilder, which renders search hits
- * into the proxy's prompt block.
+ * Cards are returned as a table of contents, while `full()` reads one card in
+ * depth — the same browsing model the MCP tools follow.
  */
 final class ProjectContext
 {

@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Conversation;
 use App\Services\Brain\Indexer;
-use App\Services\SummaryService;
-use App\Services\SyncService;
 use App\Settings\AiSettings;
 use App\Settings\ProxySettings;
 use App\Settings\RetrievalSettings;
@@ -21,36 +18,11 @@ use Illuminate\Support\Str;
 
 class BrainAdminController extends Controller
 {
-    public function sync(SyncService $sync): RedirectResponse
-    {
-        $stats = $sync->run(force: true);
-
-        return back()->with('brain_status', sprintf(
-            'Синхронизация завершена: обработано диалогов — %d, создано знаний — %d, обновлено — %d.',
-            $stats['summarized'],
-            $stats['entries_created'],
-            $stats['entries_updated'],
-        ));
-    }
-
     public function reindex(Indexer $indexer): RedirectResponse
     {
         $count = $indexer->indexAll();
 
         return back()->with('brain_status', sprintf('Переиндексировано записей: %d.', $count));
-    }
-
-    public function summarize(Conversation $conversation, SummaryService $summaries): RedirectResponse
-    {
-        $result = $summaries->summarize($conversation, force: true);
-
-        return back()->with('brain_status', sprintf(
-            'Диалог #%d: %s, создано %d, обновлено %d.',
-            $conversation->id,
-            $result['status'],
-            $result['created'],
-            $result['updated'],
-        ));
     }
 
     public function generateToken(): RedirectResponse

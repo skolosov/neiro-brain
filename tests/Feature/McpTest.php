@@ -15,7 +15,6 @@ use App\Mcp\Tools\SearchKnowledgeTool;
 use App\Models\KnowledgeChunk;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,7 +33,6 @@ class McpTest extends TestCase
                 importance: 4,
                 confidence: 1.0,
             ),
-            source: app(SourceRegistry::class)->manual(),
         );
 
         return $result['entry']->id;

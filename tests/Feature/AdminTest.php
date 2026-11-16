@@ -8,7 +8,6 @@ use App\Enums\KnowledgeKind;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
-use App\Services\Brain\SourceRegistry;
 use App\Settings\SecuritySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
@@ -39,7 +38,6 @@ class AdminTest extends TestCase
                 importance: 4,
                 confidence: 1.0,
             ),
-            source: app(SourceRegistry::class)->manual(),
         )['entry'];
     }
 
@@ -49,7 +47,7 @@ class AdminTest extends TestCase
             ->get(route('moonshine.index'))
             ->assertOk()
             ->assertSee('Neiro Brain')
-            ->assertSee('Синхронизировать');
+            ->assertSee('Карточек');
     }
 
     public function test_knowledge_entry_pages_render(): void
@@ -100,39 +98,24 @@ class AdminTest extends TestCase
         $this->assertStringStartsWith('nb-', $token);
     }
 
-    public function test_generated_token_authorizes_proxy_mcp_and_api(): void
+    public function test_generated_token_authorizes_mcp_and_api(): void
     {
         $this->actingAs($this->admin(), 'moonshine')
             ->post(route('brain.admin.tokens.generate'));
 
         $token = app(SecuritySettings::class)->refresh()->access_token;
 
-        $this->withHeaders(['X-Neiro-Proxy-Token' => $token])
-            ->postJson('/v1/chat/completions', [
-                'model' => 'test',
-                'messages' => [['role' => 'user', 'content' => 'ping']],
-            ])
-            ->assertOk();
-
         $this->withHeaders(['Authorization' => 'Bearer '.$token])
             ->getJson('/api/v1/stats')
             ->assertOk();
 
-        $this->withHeaders(['X-Neiro-Proxy-Token' => 'dev-brain-token'])
-            ->postJson('/v1/chat/completions', [
-                'model' => 'test',
-                'messages' => [['role' => 'user', 'content' => 'ping']],
-            ])
+        $this->withHeaders(['Authorization' => 'Bearer dev-brain-token'])
+            ->getJson('/api/v1/stats')
             ->assertUnauthorized();
     }
 
     public function test_guest_is_redirected_from_admin(): void
     {
         $this->get('/admin')->assertRedirect();
-    }
-
-    public function test_sync_button_route_is_protected_by_admin_auth(): void
-    {
-        $this->post('/admin/brain/sync')->assertRedirect();
     }
 }

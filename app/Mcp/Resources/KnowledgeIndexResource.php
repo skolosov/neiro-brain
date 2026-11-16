@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
-use App\Models\Conversation;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeSource;
 use App\Services\Brain\ProfileBuilder;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -50,8 +48,6 @@ class KnowledgeIndexResource extends Resource
                 'entries' => KnowledgeEntry::query()->approved()->count(),
                 'drafts' => KnowledgeEntry::query()->where('status', 'draft')->count(),
                 'chunks' => KnowledgeChunk::query()->count(),
-                'conversations' => Conversation::query()->count(),
-                'sources' => KnowledgeSource::query()->count(),
             ],
             'projects' => $projects,
             'recent' => $recent->map(fn (KnowledgeEntry $entry): array => [

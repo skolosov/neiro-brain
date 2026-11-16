@@ -72,16 +72,6 @@ class KnowledgeEntry extends Model
         ];
     }
 
-    public function source(): BelongsTo
-    {
-        return $this->belongsTo(KnowledgeSource::class, 'source_id');
-    }
-
-    public function conversation(): BelongsTo
-    {
-        return $this->belongsTo(Conversation::class);
-    }
-
     public function chunks(): HasMany
     {
         return $this->hasMany(KnowledgeChunk::class, 'entry_id');

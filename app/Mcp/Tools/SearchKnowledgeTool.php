@@ -38,7 +38,7 @@ class SearchKnowledgeTool extends Tool
             project: $validated['project'] ?? null,
             kinds: $validated['kinds'] ?? [],
             limit: $validated['limit'] ?? 8,
-        ), 'mcp');
+        ));
 
         if ($result->isEmpty()) {
             return Response::text('Ничего не найдено. Попробуй переформулировать запрос или не указывать проект.');

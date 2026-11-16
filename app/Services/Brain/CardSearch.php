@@ -79,7 +79,7 @@ final class CardSearch
             includeDrafts: $includeDrafts,
         );
 
-        $result = $this->search->search($searchQuery, 'admin');
+        $result = $this->search->search($searchQuery);
         $needles = [...$result->terms, $query];
 
         $cards = [];

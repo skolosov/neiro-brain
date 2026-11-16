@@ -24,7 +24,7 @@ class BrainSearchCommand extends Command
             query: (string) $this->argument('query'),
             project: $this->option('project') ?: null,
             limit: (int) $this->option('limit'),
-        ), 'cli');
+        ));
 
         $this->line(sprintf(
             'Query: %s | terms: %s | candidates: %d | %d ms',
