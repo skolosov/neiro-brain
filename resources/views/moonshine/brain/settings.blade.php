@@ -1,6 +1,6 @@
-@include('moonshine.brain.styles')
+@include('partials.brain-styles')
 
-<div class="nb-page">
+<div class="brain-ui nb-page">
     @if (session('brain_status'))
         <div class="nb-flash">{{ session('brain_status') }}</div>
     @endif

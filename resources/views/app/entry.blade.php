@@ -4,48 +4,48 @@
 
 @section('content')
     <div class="kicker">Карточка знаний</div>
-    <h1>{{ $entry->title }}</h1>
 
-    <div class="meta-row">
-        @if ($entry->kind)
-            <span>{{ $entry->kind->label() }}</span>
-        @endif
-        @if ($entry->scope)
-            <span>{{ $entry->scope->label() }}</span>
-        @endif
-        @if (trim((string) $entry->project) !== '')
-            <span>проект: {{ $entry->project }}</span>
-        @endif
-        @if (trim((string) $entry->theme) !== '')
-            <span>тема: {{ $entry->theme }}</span>
-        @endif
-        <span>важность: {{ $entry->importance }}/5</span>
-        <span>
-            {{ ($entry->occurred_at ?? $entry->created_at)?->format('d.m.Y') }}
-        </span>
-    </div>
+    @php
+        $panelEntry = [
+            'id' => (int) $entry->getKey(),
+            'title' => (string) $entry->title,
+            'summary' => $summary,
+            'content' => (string) $entry->content,
+            'details' => $entry->details,
+            'theme' => trim((string) $entry->theme) !== '' ? (string) $entry->theme : null,
+            'kind' => $entry->kind?->value,
+            'kind_label' => $entry->kind?->label(),
+            'project' => trim((string) $entry->project) !== '' ? (string) $entry->project : null,
+            'scope' => $entry->scope?->value,
+            'scope_label' => $entry->scope?->label(),
+            'occurred_at_label' => ($entry->occurred_at ?? $entry->created_at)?->format('d.m.Y'),
+            'updated_at' => $entry->updated_at?->format('d.m.Y H:i'),
+            'source' => $entry->source?->name,
+            'tags' => $tags,
+            'importance' => (int) $entry->importance,
+        ];
 
-    <section class="card">
-        <h2>Кратко</h2>
-        <p class="entry-text">{{ $summary }}</p>
+        // Neighbouring cards come from the same graph search the admin panel
+        // uses; only the URL differs, and the cabinet opens `/app/entries/{id}`.
+        $related = app(\App\Services\Brain\GraphSearch::class)
+            ->relatedEntries($entry, 6)
+            ->map(fn (\App\Models\KnowledgeEntry $item): array => [
+                'title' => (string) $item->title,
+                'url' => route('app.entries.show', ['entry' => $item->getKey()]),
+            ])
+            ->values()
+            ->all();
+    @endphp
 
-        <h2>Текст</h2>
-        <div class="prose">{!! nl2br(e($entry->content)) !!}</div>
-
-        @if (trim((string) $entry->details) !== '')
-            <h2>Детали</h2>
-            <div class="prose">{!! nl2br(e($entry->details)) !!}</div>
-        @endif
-
-        @if ($tags !== [])
-            <h2>Теги</h2>
-            <div class="meta-row">
-                @foreach ($tags as $tag)
-                    <span class="badge">{{ $tag }}</span>
-                @endforeach
-            </div>
-        @endif
-    </section>
+    @include('partials.entry-panel', [
+        'entry' => $panelEntry,
+        'related' => $related,
+        'tagUrl' => fn (string $tag): string => route('app.search', ['q' => $tag]),
+        'actions' => [
+            ['label' => 'На графе', 'url' => route('app.graph')],
+        ],
+        'titleTag' => 'h1',
+    ])
 
     <section class="card">
         <h2>История версий</h2>

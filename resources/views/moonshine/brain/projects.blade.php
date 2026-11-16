@@ -1,7 +1,6 @@
-@include('moonshine.brain.styles')
-@include('moonshine.brain.cards')
+@include('partials.brain-styles')
 
-<div class="nb-page">
+<div class="brain-ui nb-page">
     @if (session('brain_status'))
         <div class="nb-flash">{{ session('brain_status') }}</div>
     @endif
@@ -20,46 +19,30 @@
         </div>
     </div>
 
-    @if ($projects->isEmpty())
-        <div class="nb-empty-hint">
-            Проектов пока нет: в карточках не заполнено поле «Проект».
-            Это нормально, если знания общие — тогда смотрите
-            <a href="{{ $searchUrl }}">карточки по темам</a>.
-        </div>
-    @else
-        <div class="nb-projects-grid">
-            @foreach ($projects as $project)
-                <article class="nb-card nb-project-card">
-                    <header class="nb-project-head">
-                        <h2><a href="{{ $project['url'] }}">{{ $project['name'] }}</a></h2>
-                        <span class="nb-pill">{{ $project['count'] }} карточек</span>
-                    </header>
+    @php
+        $items = $projects
+            ->map(fn (array $project): array => [
+                'name' => (string) $project['name'],
+                'count' => (int) $project['count'],
+                'url' => (string) $project['url'],
+                'topics' => (array) $project['topics'],
+                'topicUrl' => fn (string $topic): string => route('moonshine.page', [
+                    'pageUri' => 'search-page',
+                    'topic' => $topic,
+                    'project' => $project['name'],
+                ]),
+                'importance' => (int) $project['importance'],
+                'last' => $project['last']?->diffForHumans(),
+                'graphUrl' => $graphUrl.'?project='.urlencode($project['name']),
+            ])
+            ->values()
+            ->all();
+    @endphp
 
-                    <div class="nb-project-meta">
-                        <span>важность {{ $project['importance'] }}/5</span>
-                        @if ($project['last'])
-                            <span>последняя {{ $project['last']->diffForHumans() }}</span>
-                        @endif
-                    </div>
-
-                    <div class="nb-chip-row">
-                        @foreach ($project['topics'] as $topic => $count)
-                            <a class="nb-chip" href="{{ $searchUrl.'?topic='.urlencode($topic) }}&project={{ urlencode($project['name']) }}">
-                                {{ $topic }} <span class="nb-chip-count">{{ $count }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-
-                    <footer class="nb-card-w-links">
-                        <a class="nb-card-w-link" href="{{ $project['url'] }}">
-                            <span class="nb-card-w-link-dot"></span>
-                            <span class="nb-card-w-link-label">Все карточки проекта</span>
-                        </a>
-                        <a class="nb-card-w-link nb-card-w-link-project"
-                           href="{{ $graphUrl.'?project='.urlencode($project['name']) }}">На графе</a>
-                    </footer>
-                </article>
-            @endforeach
-        </div>
-    @endif
+    @include('partials.project-list', [
+        'projects' => $items,
+        'emptyTitle' => 'Проектов пока нет',
+        'emptyText' => 'В карточках не заполнено поле «Проект». Это нормально, если знания общие — тогда смотрите',
+        'emptyLink' => ['label' => 'карточки по темам', 'url' => $searchUrl],
+    ])
 </div>

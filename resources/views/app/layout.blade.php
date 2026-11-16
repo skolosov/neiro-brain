@@ -58,11 +58,6 @@
         .badge.write { background: #3b1d52; color: #f0d9ff; }
         .badge.read { background: #1d2c52; color: #d9e6ff; }
         .auth-card { max-width: 420px; margin: 48px auto; }
-        .entry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-        .entry-item { border: 1px solid #332b52; background: #17122b; border-radius: 14px; padding: 18px 20px; }
-        .entry-item h2 { margin: 0 0 6px; font-size: 17px; }
-        .entry-item h2 a { color: #f5f2ff; text-decoration: none; }
-        .entry-item h2 a:hover { color: #c4b5fd; }
         .meta-row { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #8f86ab; font-size: 13px; margin: 0 0 8px; }
         .entry-text { color: #ddd6fe; margin: 0 0 10px; }
         .prose { color: #e7e1ff; line-height: 1.65; white-space: normal; }
@@ -74,6 +69,7 @@
         .footer-inner { max-width: 980px; margin: 0 auto; padding: 22px 24px; }
         @media (max-width: 560px) { .wrap { padding: 24px 16px 48px; } .top-inner { padding: 14px 16px; } }
     </style>
+    @include('partials.brain-styles')
 </head>
 <body>
 <header class="top">
@@ -113,7 +109,9 @@
         </div>
     @endif
 
-    @yield('content')
+    <div class="brain-ui brain-ui-dark">
+        @yield('content')
+    </div>
 </main>
 
 <footer>
