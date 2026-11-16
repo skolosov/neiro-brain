@@ -5,6 +5,10 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\BrainAdminController;
 use App\Http\Controllers\App\Auth\LoginController;
 use App\Http\Controllers\App\DashboardController;
+use App\Http\Controllers\App\EntryController;
+use App\Http\Controllers\App\GraphController;
+use App\Http\Controllers\App\ProjectsController;
+use App\Http\Controllers\App\SearchController;
 use App\Http\Controllers\App\TokenController;
 use Illuminate\Support\Facades\Route;
 use MoonShine\Laravel\Http\Middleware\Authenticate;
@@ -29,12 +33,19 @@ Route::post('/logout', [LoginController::class, 'logout'])
     ->middleware('auth:web')
     ->name('logout');
 
-Route::middleware('auth:web')
+Route::middleware(['auth:web', 'owner.session'])
     ->prefix('app')
     ->name('app.')
     ->group(function (): void {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::patch('/profile', [DashboardController::class, 'updateProfile'])->name('profile.update');
+
+        Route::get('/search', [SearchController::class, 'index'])->name('search');
+        Route::get('/entries/{entry}', [EntryController::class, 'show'])
+            ->whereNumber('entry')
+            ->name('entries.show');
+        Route::get('/projects', [ProjectsController::class, 'index'])->name('projects');
+        Route::get('/graph', [GraphController::class, 'index'])->name('graph');
 
         Route::get('/tokens', [TokenController::class, 'index'])->name('tokens.index');
         Route::post('/tokens', [TokenController::class, 'store'])->name('tokens.store');

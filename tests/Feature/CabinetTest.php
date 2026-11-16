@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\KnowledgeKind;
+use App\Enums\KnowledgeScope;
+use App\Models\KnowledgeEntry;
 use App\Models\User;
 use App\Services\Auth\TokenIssuer;
+use App\Services\Brain\Dto\ExtractedEntry;
+use App\Services\Brain\KnowledgeWriter;
+use App\Support\OwnerContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -186,5 +192,93 @@ class CabinetTest extends TestCase
 
         $this->assertSame('Новое имя', $user->name);
         $this->assertSame('en', $user->locale);
+    }
+
+    public function test_cabinet_search_finds_only_own_cards(): void
+    {
+        $user = $this->user();
+        $other = $this->user(['email' => 'other@example.test']);
+
+        $mine = $this->writeFor($user, 'Мой Laravel стек', 'Laravel 13 и PostgreSQL.');
+        $this->writeFor($other, 'Чужой Laravel стек', 'Laravel у другого человека.');
+
+        $this->actingAs($user)
+            ->get('/app/search?q=Laravel')
+            ->assertOk()
+            ->assertSee($mine->title)
+            ->assertDontSee('Чужой Laravel стек');
+    }
+
+    public function test_foreign_entry_is_not_found(): void
+    {
+        $user = $this->user();
+        $other = $this->user(['email' => 'other@example.test']);
+        $foreign = $this->writeFor($other, 'Чужая карточка', 'Секрет другого человека.');
+
+        $this->actingAs($user)
+            ->get('/app/entries/'.$foreign->id)
+            ->assertNotFound();
+    }
+
+    public function test_cabinet_graph_contains_only_own_nodes(): void
+    {
+        $user = $this->user();
+        $other = $this->user(['email' => 'other@example.test']);
+
+        $this->writeFor($user, 'Своя карточка для графа', 'Мой факт про Laravel.', 'neiro-brain');
+        $this->writeFor($other, 'Чужая карточка для графа', 'Чужой факт про Laravel.', 'neiro-brain');
+
+        $this->actingAs($user)
+            ->get('/app/graph')
+            ->assertOk()
+            ->assertSee('Своя карточка для графа')
+            ->assertDontSee('Чужая карточка для графа');
+    }
+
+    public function test_entry_history_shows_the_superseded_version(): void
+    {
+        $user = $this->user();
+
+        app(OwnerContext::class)->set($user);
+
+        $old = $this->writeFor($user, 'Старая версия карточки', 'Старый текст про Laravel.');
+        $new = app(KnowledgeWriter::class)->supersede($old, new ExtractedEntry(
+            kind: KnowledgeKind::Stack,
+            title: 'Новая версия карточки',
+            content: 'Новый текст про Laravel 13.',
+            project: 'neiro-brain',
+            scope: KnowledgeScope::Project,
+        ));
+
+        $this->actingAs($user)
+            ->get('/app/entries/'.$new->id)
+            ->assertOk()
+            ->assertSee('Новая версия карточки')
+            ->assertSee('Старая версия карточки')
+            ->assertSee('устаревшая версия');
+    }
+
+    /**
+     * Записать карточку от имени конкретного владельца.
+     */
+    private function writeFor(
+        User $owner,
+        string $title,
+        string $content,
+        ?string $project = null,
+    ): KnowledgeEntry {
+        app(OwnerContext::class)->set($owner);
+
+        $result = app(KnowledgeWriter::class)->write(new ExtractedEntry(
+            kind: KnowledgeKind::Stack,
+            title: $title,
+            content: $content,
+            project: $project,
+            scope: $project !== null ? KnowledgeScope::Project : KnowledgeScope::Profile,
+        ));
+
+        $this->assertIsArray($result);
+
+        return $result['entry'];
     }
 }

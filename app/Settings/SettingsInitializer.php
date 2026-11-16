@@ -24,11 +24,9 @@ final class SettingsInitializer
 {
     /** @var list<class-string<Settings>> */
     private const CLASSES = [
-        AiSettings::class,
         RetrievalSettings::class,
-        ProxySettings::class,
-        SyncSettings::class,
         SecuritySettings::class,
+        RulesSettings::class,
     ];
 
     public function ensure(): void

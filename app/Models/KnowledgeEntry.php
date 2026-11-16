@@ -108,6 +108,11 @@ class KnowledgeEntry extends Model
         return $this->hasMany(KnowledgeChunk::class, 'entry_id');
     }
 
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
+    }
+
     public function terms(): HasManyThrough
     {
         return $this->hasManyThrough(

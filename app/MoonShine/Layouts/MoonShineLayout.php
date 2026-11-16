@@ -8,7 +8,9 @@ use App\MoonShine\Pages\GraphPage;
 use App\MoonShine\Pages\ProjectsPage;
 use App\MoonShine\Pages\SearchPage;
 use App\MoonShine\Pages\SettingsPage;
+use App\MoonShine\Resources\ApiToken\ApiTokenResource;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
+use App\MoonShine\Resources\User\UserResource;
 use MoonShine\ColorManager\ColorManager;
 use MoonShine\ColorManager\Palettes\PurplePalette;
 use MoonShine\Contracts\ColorManager\ColorManagerContract;
@@ -42,6 +44,10 @@ final class MoonShineLayout extends AppLayout
                 MenuItem::make(KnowledgeEntryResource::class, 'Знания', 'book-open'),
                 MenuItem::make(SettingsPage::class, 'Настройки', 'cog-6-tooth'),
             ], 'book-open'),
+            MenuGroup::make('Люди', [
+                MenuItem::make(UserResource::class, 'Люди', 'users'),
+                MenuItem::make(ApiTokenResource::class, 'Токены', 'key'),
+            ], 'users'),
         ];
     }
 

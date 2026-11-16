@@ -29,6 +29,9 @@ class KnowledgeEntryResource extends ModelResource
 
     protected bool $simplePaginate = true;
 
+    /** @var list<string> */
+    protected array $with = ['owner'];
+
     protected function pages(): array
     {
         return [

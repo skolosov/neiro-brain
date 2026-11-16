@@ -6,6 +6,7 @@ namespace App\Services\Brain;
 
 use App\Models\KnowledgeEntry;
 use App\Models\User;
+use App\Settings\RulesSettings;
 use App\Support\OwnerContext;
 
 /**
@@ -39,11 +40,27 @@ MARKDOWN;
 
     public function build(): string
     {
+        $text = $this->withExtraRules(self::BASE);
+
         if (! $this->owners->has()) {
-            return self::BASE;
+            return $text;
         }
 
-        return self::BASE."\n\n".$this->ownerSection($this->owners->owner());
+        return $text."\n\n".$this->ownerSection($this->owners->owner());
+    }
+
+    /**
+     * Дополнительные правила владельца из настроек — в конец базового текста.
+     */
+    private function withExtraRules(string $text): string
+    {
+        $extra = trim((string) app(RulesSettings::class)->instructions_extra);
+
+        if ($extra === '') {
+            return $text;
+        }
+
+        return $text."\n\n".$extra;
     }
 
     private function ownerSection(User $owner): string

@@ -28,41 +28,31 @@
         @csrf
 
         <section class="nb-section">
-            <h2>Память и прокси</h2>
+            <h2>Правила для агента</h2>
+            <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
+                Дополнительный текст дописывается в конец базовых правил, которые MCP-сервер
+                отдаёт агенту при инициализации. Здесь же — заметка к skill-файлу.
+            </p>
+
             <div class="nb-form-grid">
                 <div>
-                    <label class="nb-label">Top K памяти в промпте</label>
-                    <input type="number" name="proxy_top_k" value="{{ old('proxy_top_k', $proxy->top_k) }}" min="1" max="20" class="nb-input">
+                    <label class="nb-label" for="instructions_extra">Дополнительные правила для агента</label>
+                    <textarea id="instructions_extra" name="instructions_extra" rows="7" class="nb-input" style="min-height:9rem;resize:vertical">{{ old('instructions_extra', $rules->instructions_extra) }}</textarea>
+                    <p class="nb-help">Например: «Отвечай по-русски и всегда указывай, из какой карточки взят факт».</p>
                 </div>
                 <div>
-                    <label class="nb-label">Лимит блока памяти, символов</label>
-                    <input type="number" name="proxy_max_context_chars" value="{{ old('proxy_max_context_chars', $proxy->max_context_chars) }}" min="500" max="20000" class="nb-input">
+                    <label class="nb-label" for="skill_note">Заметка к skill-файлу</label>
+                    <textarea id="skill_note" name="skill_note" rows="5" class="nb-input" style="min-height:6rem;resize:vertical">{{ old('skill_note', $rules->skill_note) }}</textarea>
+                    <p class="nb-help">Свободная заметка для себя: что стоит поправить в описании навыка.</p>
                 </div>
-            </div>
-            <div class="nb-checks">
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_enabled" value="0">
-                    <input type="checkbox" name="proxy_enabled" value="1" @checked($proxy->enabled)>
-                    Прокси включён
-                </label>
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_inject_memory" value="0">
-                    <input type="checkbox" name="proxy_inject_memory" value="1" @checked($proxy->inject_memory)>
-                    Подмешивать память
-                </label>
-                <label class="nb-check">
-                    <input type="hidden" name="proxy_capture" value="0">
-                    <input type="checkbox" name="proxy_capture" value="1" @checked($proxy->capture)>
-                    Записывать диалоги
-                </label>
             </div>
         </section>
 
         <section class="nb-section">
             <h2>Поиск</h2>
             <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
-                Параметры Okapi BM25 — по ним база ищет факты, которые подмешиваются в промпт
-                и отдаются через MCP. Меняются на лету, без переиндексации.
+                Параметры Okapi BM25 — по ним база ищет факты, которые отдаются через MCP
+                и показываются в кабинете. Меняются на лету, без переиндексации.
             </p>
             <div class="nb-form-grid nb-form-grid-3">
                 @foreach ([
@@ -84,88 +74,6 @@
         </section>
 
         <section class="nb-section">
-            <h2>Суммаризация</h2>
-            <div class="nb-form-grid nb-form-grid-3">
-                <div>
-                    <label class="nb-label">Провайдер для извлечения знаний</label>
-                    <select name="ai_provider" class="nb-select">
-                        @foreach (['openai' => 'OpenAI', 'anthropic' => 'Anthropic', 'deepseek' => 'DeepSeek', 'openrouter' => 'OpenRouter', 'ollama' => 'Ollama', 'gemini' => 'Gemini'] as $value => $name)
-                            <option value="{{ $value }}" @selected($ai->provider === $value)>{{ $name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="nb-label">Модель</label>
-                    <input type="text" name="ai_model" value="{{ old('ai_model', $ai->model) }}" class="nb-input">
-                </div>
-                <div>
-                    <label class="nb-label">API-ключ</label>
-                    <input type="password" name="ai_api_key" value="" class="nb-input" autocomplete="new-password"
-                           placeholder="{{ $ai->api_key !== '' ? '•••••••• (оставьте пустым, чтобы не менять)' : 'не задан — работает эвристический экстрактор' }}">
-                </div>
-                <div>
-                    <label class="nb-label">Base URL (необязательно)</label>
-                    <input type="text" name="ai_base_url" value="{{ old('ai_base_url', $ai->base_url) }}" class="nb-input" placeholder="https://api.deepseek.com">
-                </div>
-                <div>
-                    <label class="nb-label">Temperature</label>
-                    <input type="number" step="0.05" min="0" max="2" name="ai_temperature" value="{{ old('ai_temperature', $ai->temperature) }}" class="nb-input">
-                </div>
-                <div>
-                    <label class="nb-label">Max tokens</label>
-                    <input type="number" min="256" max="200000" name="ai_max_tokens" value="{{ old('ai_max_tokens', $ai->max_tokens) }}" class="nb-input">
-                </div>
-            </div>
-            <div class="nb-checks">
-                <label class="nb-check">
-                    <input type="hidden" name="ai_enabled" value="0">
-                    <input type="checkbox" name="ai_enabled" value="1" @checked($ai->enabled)>
-                    Использовать AI-провайдера (при ошибке — fallback на эвристику)
-                </label>
-            </div>
-            <p class="nb-help">Ключ нужен только для суммаризации диалогов в cron, прокси его не использует.</p>
-        </section>
-
-        <section class="nb-section">
-            <h2>Синхронизация</h2>
-            <div class="nb-form-grid nb-form-grid-3">
-                <div>
-                    <label class="nb-label">Тишина перед суммаризацией, минут</label>
-                    <input type="number" name="sync_quiet_minutes" value="{{ old('sync_quiet_minutes', $sync->quiet_minutes) }}" min="0" max="1440" class="nb-input">
-                </div>
-                <div>
-                    <label class="nb-label">Диалогов за запуск</label>
-                    <input type="number" name="sync_batch_size" value="{{ old('sync_batch_size', $sync->batch_size) }}" min="1" max="200" class="nb-input">
-                </div>
-                <div>
-                    <label class="nb-label">Статус cron</label>
-                    <label class="nb-check" style="margin-top:.55rem">
-                        <input type="hidden" name="sync_enabled" value="0">
-                        <input type="checkbox" name="sync_enabled" value="1" @checked($sync->enabled)>
-                        Cron включён
-                    </label>
-                </div>
-                <div>
-                    <label class="nb-label">Хранить переписку, часов</label>
-                    <input type="number" name="sync_transcript_retention_hours" value="{{ old('sync_transcript_retention_hours', $sync->transcript_retention_hours) }}" min="0" max="8760" class="nb-input">
-                </div>
-            </div>
-            <div class="nb-checks">
-                <label class="nb-check">
-                    <input type="hidden" name="sync_auto_approve" value="0">
-                    <input type="checkbox" name="sync_auto_approve" value="1" @checked($sync->auto_approve)>
-                    Автоматически подтверждать извлечённые знания
-                </label>
-            </div>
-            <p class="nb-help">
-                Синхронизация раз в 15 минут через OpenServer-задачу <code>Laravel Schedule</code>.
-                Переписка — только сырьё для суммаризации: после того как из неё сделаны карточки,
-                сообщения удаляются (по умолчанию через 24 часа; <code>0</code> — не удалять).
-                Сами диалоги остаются у провайдера, у нас — только карточки знаний и счётчики.
-            </p>
-        </section>
-
-        <section class="nb-section">
             <h2>Приватность</h2>
             <div class="nb-checks" style="margin-top:0">
                 <label class="nb-check">
@@ -183,7 +91,7 @@
 
         <div class="nb-actions-bottom">
             <button type="submit" class="nb-btn nb-btn-primary" style="padding:.7rem 1.4rem">Сохранить настройки</button>
-            <span class="nb-note">Пустые секретные поля не перезаписываются.</span>
+            <span class="nb-note">Дополнительные правила попадают в Instructions MCP сразу после сохранения.</span>
         </div>
     </form>
 </div>

@@ -58,6 +58,18 @@
         .badge.write { background: #3b1d52; color: #f0d9ff; }
         .badge.read { background: #1d2c52; color: #d9e6ff; }
         .auth-card { max-width: 420px; margin: 48px auto; }
+        .entry-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+        .entry-item { border: 1px solid #332b52; background: #17122b; border-radius: 14px; padding: 18px 20px; }
+        .entry-item h2 { margin: 0 0 6px; font-size: 17px; }
+        .entry-item h2 a { color: #f5f2ff; text-decoration: none; }
+        .entry-item h2 a:hover { color: #c4b5fd; }
+        .meta-row { display: flex; flex-wrap: wrap; gap: 6px 14px; color: #8f86ab; font-size: 13px; margin: 0 0 8px; }
+        .entry-text { color: #ddd6fe; margin: 0 0 10px; }
+        .prose { color: #e7e1ff; line-height: 1.65; white-space: normal; }
+        .version { border-left: 3px solid #4c3f78; padding-left: 14px; margin: 14px 0; }
+        .version.current { border-left-color: #22c55e; }
+        .version.outdated { border-left-color: #a16207; }
+        .version h3 { margin: 0 0 4px; font-size: 16px; color: #f5f2ff; }
         footer { border-top: 1px solid #2a2342; color: #8f86ab; font-size: 13px; }
         .footer-inner { max-width: 980px; margin: 0 auto; padding: 22px 24px; }
         @media (max-width: 560px) { .wrap { padding: 24px 16px 48px; } .top-inner { padding: 14px 16px; } }
@@ -69,12 +81,14 @@
         <a class="brand" href="{{ auth()->check() ? route('app.dashboard') : url('/') }}">Neiro<span>Brain</span></a>
         <nav>
             @auth
-                <a href="{{ route('app.dashboard') }}">Кабинет</a>
+                <a href="{{ route('app.search') }}">Поиск</a>
+                <a href="{{ route('app.projects') }}">Проекты</a>
+                <a href="{{ route('app.graph') }}">Граф</a>
                 <a href="{{ route('app.tokens.index') }}">Токены</a>
-                <a href="{{ url('/admin') }}">Админка</a>
+                <a href="{{ route('app.dashboard') }}">Профиль</a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="link-button">Выйти</button>
+                    <button type="submit" class="link-button">Выход</button>
                 </form>
             @else
                 <a href="{{ route('login') }}">Вход</a>

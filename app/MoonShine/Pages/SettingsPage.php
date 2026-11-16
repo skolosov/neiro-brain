@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Pages;
 
-use App\Settings\AiSettings;
-use App\Settings\ProxySettings;
 use App\Settings\RetrievalSettings;
+use App\Settings\RulesSettings;
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
-use App\Settings\SyncSettings;
 use Illuminate\Contracts\Support\Renderable;
 use MoonShine\Laravel\Pages\Page;
 use MoonShine\MenuManager\Attributes\Group;
@@ -43,11 +41,9 @@ class SettingsPage extends Page
         app(SettingsInitializer::class)->ensure();
 
         $data = [
-            'ai' => app(AiSettings::class),
             'retrieval' => app(RetrievalSettings::class),
-            'proxy' => app(ProxySettings::class),
-            'sync' => app(SyncSettings::class),
             'security' => app(SecuritySettings::class),
+            'rules' => app(RulesSettings::class),
         ];
 
         return [

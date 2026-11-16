@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Settings\AiSettings;
-use App\Settings\ProxySettings;
+use App\Settings\RetrievalSettings;
+use App\Settings\RulesSettings;
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,12 +20,12 @@ class SettingsTest extends TestCase
     {
         app(SettingsInitializer::class)->ensure();
 
-        foreach (['ai', 'retrieval', 'proxy', 'sync', 'security'] as $group) {
+        foreach (['retrieval', 'security', 'rules'] as $group) {
             $this->assertGreaterThan(0, DB::table('settings')->where('group', $group)->count(), $group);
         }
 
-        $this->assertSame('mock', app(ProxySettings::class)->upstream);
-        $this->assertTrue(app(AiSettings::class)->heuristic_fallback);
+        $this->assertSame(1.2, app(RetrievalSettings::class)->k1);
+        $this->assertNull(app(RulesSettings::class)->instructions_extra);
     }
 
     public function test_initializer_adds_a_missing_property_next_to_legacy_rows(): void
@@ -56,29 +56,29 @@ class SettingsTest extends TestCase
         $this->assertTrue(app(SecuritySettings::class)->refresh()->mask_emails);
     }
 
-    public function test_initializer_does_not_re_encrypt_existing_values(): void
+    public function test_initializer_does_not_overwrite_existing_values(): void
     {
-        $proxy = app(ProxySettings::class);
-        $proxy->api_key = 'sk-existing-secret';
-        $proxy->save();
+        $rules = app(RulesSettings::class);
+        $rules->instructions_extra = 'Сохранить это правило.';
+        $rules->save();
 
-        DB::table('settings')->where('group', 'proxy')->where('name', 'top_k')->delete();
+        DB::table('settings')->where('group', 'retrieval')->where('name', 'top_k')->delete();
 
         app(SettingsInitializer::class)->ensure();
 
-        $this->assertSame('sk-existing-secret', app(ProxySettings::class)->refresh()->api_key);
+        $this->assertSame('Сохранить это правило.', app(RulesSettings::class)->refresh()->instructions_extra);
+        $this->assertDatabaseHas('settings', ['group' => 'retrieval', 'name' => 'top_k']);
     }
 
-    public function test_secrets_are_encrypted_at_rest_and_decrypted_on_load(): void
+    public function test_rules_are_stored_as_plain_text_not_encrypted(): void
     {
-        $proxy = app(ProxySettings::class);
-        $proxy->api_key = 'sk-live-abcdefghijklmnopqrstuvwxyz';
-        $proxy->save();
+        $rules = app(RulesSettings::class);
+        $rules->instructions_extra = 'Не секрет, а правило для агента.';
+        $rules->save();
 
-        $keyPayload = DB::table('settings')->where('group', 'proxy')->where('name', 'api_key')->value('payload');
+        $payload = DB::table('settings')->where('group', 'rules')->where('name', 'instructions_extra')->value('payload');
 
-        $this->assertStringNotContainsString('sk-live-', (string) $keyPayload);
-        $this->assertStringContainsString('eyJpdiI', (string) $keyPayload);
-        $this->assertSame('sk-live-abcdefghijklmnopqrstuvwxyz', app(ProxySettings::class)->refresh()->api_key);
+        $this->assertSame('Не секрет, а правило для агента.', json_decode((string) $payload, true));
+        $this->assertSame('Не секрет, а правило для агента.', app(RulesSettings::class)->refresh()->instructions_extra);
     }
 }

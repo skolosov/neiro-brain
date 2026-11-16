@@ -146,45 +146,7 @@
     .nb-status-ok { background: #22c55e; }
     .nb-status-error { background: #ef4444; }
 
-    /* Graph page */
-    .nb-graph-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-    @media (min-width: 1200px) { .nb-graph-layout { grid-template-columns: minmax(0, 1fr) 22rem; } }
-    .nb-graph-wrap { position: relative; border: 1px solid var(--nb-border); border-radius: .75rem; background: var(--nb-card); overflow: hidden; }
-    .nb-graph-canvas { display: block; width: 100%; height: 34rem; touch-action: none; cursor: grab; }
-    .nb-graph-canvas:active { cursor: grabbing; }
-    .nb-graph-toolbar {
-        position: absolute;
-        top: .6rem;
-        left: .6rem;
-        display: flex;
-        gap: .3rem;
-        z-index: 2;
-    }
-    .nb-graph-toolbar .nb-btn { padding: .35rem .6rem; font-size: .8rem; background: var(--nb-card); }
-    .nb-graph-legend {
-        position: absolute;
-        bottom: .6rem;
-        left: .6rem;
-        display: flex;
-        flex-wrap: wrap;
-        gap: .9rem;
-        font-size: .72rem;
-        color: var(--nb-muted);
-        z-index: 2;
-        background: color-mix(in srgb, var(--nb-card) 82%, transparent);
-        padding: .3rem .5rem;
-        border-radius: .4rem;
-    }
-    .nb-graph-legend span { display: inline-flex; align-items: center; gap: .35rem; }
-    .nb-graph-legend i { width: .5rem; height: .5rem; border-radius: 999px; display: inline-block; }
-    .nb-graph-search {
-        position: absolute;
-        top: .6rem;
-        right: .6rem;
-        width: min(20rem, 60%);
-        z-index: 2;
-    }
-    .nb-graph-side { display: flex; flex-direction: column; gap: .75rem; }
+    /* Graph page lives in resources/views/partials/brain-graph.blade.php. */
     .nb-peek { border: 1px solid var(--nb-border); border-radius: .75rem; padding: .9rem 1rem; background: var(--nb-card); }
     .nb-peek h3 { margin: 0 0 .25rem; font-size: 1rem; line-height: 1.3; }
     .nb-peek-meta { font-size: .72rem; color: var(--nb-muted); margin-bottom: .5rem; }

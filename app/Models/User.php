@@ -8,8 +8,10 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use MoonShine\Laravel\Models\MoonshineUser;
 
 #[Fillable(['name', 'email', 'password', 'locale', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
@@ -30,5 +32,23 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Связь с админкой MoonShine: `moonshine_users.user_id`.
+     *
+     * У человека может не быть доступа в админку, поэтому связь необязательная.
+     */
+    public function moonshineUser(): HasOne
+    {
+        return $this->hasOne(MoonshineUser::class, 'user_id');
+    }
+
+    /**
+     * Email админского аккаунта для списка людей. Пустая строка — доступа нет.
+     */
+    public function getAdminEmailAttribute(): string
+    {
+        return (string) ($this->moonshineUser?->email ?? '');
     }
 }

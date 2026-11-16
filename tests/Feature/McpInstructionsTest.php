@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Mcp\Servers\KnowledgeServer;
 use App\Models\User;
 use App\Services\Brain\InstructionsBuilder;
+use App\Settings\RulesSettings;
 use App\Support\OwnerContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -82,6 +83,22 @@ class McpInstructionsTest extends TestCase
         $this->assertStringContainsString('Имя: Пётр', $secondText);
         $this->assertStringContainsString('Язык: en', $secondText);
         $this->assertStringNotContainsString('Имя: Пётр', $firstText);
+    }
+
+    public function test_extra_rules_from_settings_reach_mcp_instructions(): void
+    {
+        $settings = app(RulesSettings::class);
+        $settings->instructions_extra = '## Правила владельца'."\n".'- Всегда отвечай кратко и по-русски.';
+        $settings->save();
+
+        $owner = $this->owner();
+        $issued = $this->issueToken($owner, ['read', 'write']);
+
+        $instructions = $this->initialize($issued['plain']);
+
+        $this->assertStringContainsString('Всегда отвечай кратко и по-русски.', $instructions);
+        $this->assertStringContainsString('## Правила владельца', $instructions);
+        $this->assertStringStartsWith(InstructionsBuilder::BASE, $instructions);
     }
 
     public function test_empty_context_returns_only_the_base_text(): void

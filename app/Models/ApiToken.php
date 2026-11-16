@@ -46,6 +46,14 @@ class ApiToken extends Model
     }
 
     /**
+     * Способности одной строкой — для колонки админки.
+     */
+    public function getAbilitiesTextAttribute(): string
+    {
+        return implode(', ', $this->abilities ?? []);
+    }
+
+    /**
      * Право read подразумевается правом write: кто может писать, тот может и
      * читать. Обратное неверно — токен только для чтения писать не умеет.
      */
