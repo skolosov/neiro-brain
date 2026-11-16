@@ -90,20 +90,54 @@ Authorization: Bearer nb-…
 
 Дев-токена и токена в адресе нет: оба удалены вместе с прокси.
 
-## Шаг 4. Подключить MCP
+## Шаг 4. Поставить скилл `/brain`
 
-```json
-{
-  "mcpServers": {
-    "neiro-brain": {
-      "url": "http://neiro-brain.local/mcp/knowledge",
-      "headers": { "Authorization": "Bearer nb-…" }
-    }
-  }
-}
+Скилл публичный: токен для скачивания не нужен, иначе первый шаг невыполним.
+Скрипты установки делает сам сервер, они ставят тот адрес, с которого скачаны.
+
+Windows (PowerShell):
+
+```powershell
+irm http://neiro-brain.local/skill/install.ps1 | iex
 ```
 
-Claude Code:
+macOS и Linux:
+
+```bash
+curl -fsSL http://neiro-brain.local/skill/install.sh | sh
+```
+
+Вручную, если скриптам не доверяете — это ровно то же самое в одну строку:
+
+```bash
+mkdir -p ~/.agents/skills/brain
+curl -fsSL http://neiro-brain.local/skill/brain -o ~/.agents/skills/brain/SKILL.md
+```
+
+На macOS тот же путь: `~/.agents/skills/brain/SKILL.md` (в Finder —
+`Cmd+Shift+G` → `~/.agents/skills`).
+
+У кого есть доступ к серверу — та же установка без сети:
+
+```powershell
+php artisan brain:skill            # копирует в ~/.agents/skills/brain/SKILL.md
+php artisan brain:skill --force    # перезаписать установленный
+php artisan brain:skill --path=D:\skills
+```
+
+Файл на диске тонкий: он велит прочитать ресурс `knowledge://skill/brain`, а полный
+протокол живёт на сервере и меняется вместе с кодом. В харнессе сразу проверьте
+`/brain help`.
+
+## Шаг 5. Подключить MCP
+
+Проще всего отдать это скиллу: в харнессе наберите `/brain init`, он спросит адрес
+и токен, покажет, что вставит в конфиг, сделает бэкап и проверит связь. После
+перезапуска харнесса — `/brain doctor`.
+
+Руками, если `init` не подошёл.
+
+Claude Code (Windows, macOS, Linux):
 
 ```bash
 claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowledge \
@@ -112,6 +146,25 @@ claude mcp add --transport http neiro-brain http://neiro-brain.local/mcp/knowled
 
 DeepSeek Harness — плагин `@deepseek-ai/dsh-mcp-client`, `transport: streamable-http`
 и тот же URL; готовый YAML в [deepseek-harness.md](deepseek-harness.md).
+
+Claude Desktop (macOS и Windows) HTTP напрямую не умеет: нужен мост `mcp-remote`
+и установленный Node. В `claude_desktop_config.json` (macOS —
+`~/Library/Application Support/Claude/claude_desktop_config.json`, Windows —
+`%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "neiro-brain": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote", "http://neiro-brain.local/mcp/knowledge",
+        "--header", "Authorization: Bearer nb-…"
+      ]
+    }
+  }
+}
+```
 
 Инструменты: `search_knowledge`, `get_knowledge`, `remember_many` (`items`,
 `supersedes`), `delete_knowledge`, `list_projects`, `recent_knowledge`,
@@ -130,18 +183,6 @@ curl -sS http://neiro-brain.local/mcp/knowledge \
 
 Пустой ответ `Ничего не найдено` — норма для новой базы: сначала попросите агента
 запомнить факт через `remember_many`.
-
-## Шаг 5. Поставить скилл `/brain`
-
-```powershell
-php artisan brain:skill            # копирует в ~/.agents/skills/brain/SKILL.md
-php artisan brain:skill --force    # перезаписать установленный
-php artisan brain:skill --path=D:\skills
-```
-
-Файл на диске тонкий: он велит прочитать ресурс `knowledge://skill/brain`, а
-полный протокол живёт на сервере и меняется вместе с кодом. `/brain compact` —
-слияние дублей через `remember_many` с `supersedes` и подтверждением плана.
 
 ## Шаг 6. Проверить запись и чтение
 

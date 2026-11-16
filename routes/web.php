@@ -10,12 +10,28 @@ use App\Http\Controllers\App\GraphController;
 use App\Http\Controllers\App\ProjectsController;
 use App\Http\Controllers\App\SearchController;
 use App\Http\Controllers\App\TokenController;
+use App\Http\Controllers\SkillController;
 use Illuminate\Support\Facades\Route;
 use MoonShine\Laravel\Http\Middleware\Authenticate;
 
 Route::get('/', function () {
     return view('home');
 })->name('home');
+
+/*
+|--------------------------------------------------------------------------
+| Скилл /brain и его установка
+|--------------------------------------------------------------------------
+|
+| Публично, потому что иначе первый шаг невыполним: пока скилл не стоит,
+| человеку негде узнать про кабинет и токен. Секрета в файле нет, знания
+| по-прежнему закрыты токеном на /mcp/knowledge.
+|
+*/
+
+Route::get('/skill/brain', [SkillController::class, 'skill'])->name('skill.show');
+Route::get('/skill/install.ps1', [SkillController::class, 'installPs1'])->name('skill.install.ps1');
+Route::get('/skill/install.sh', [SkillController::class, 'installSh'])->name('skill.install.sh');
 
 /*
 |--------------------------------------------------------------------------

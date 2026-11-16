@@ -44,9 +44,10 @@ PostgreSQL: карточки → чанки → инвертированный �
   подразумевает `read`).
 - **Секреты вырезаются** `SecretMasker` до записи; настройки spatie/laravel-settings
   шифруются `APP_KEY`.
-- **Скилл `/brain`** ставится командой `php artisan brain:skill`; полный протокол
-  сервер отдаёт ресурсом `knowledge://skill/brain`, поэтому копия на диске не
-  устаревает.
+- **Скилл `/brain`** ставится одной строкой из публичного скрипта сервера
+  (`/skill/install.ps1`, `/skill/install.sh`), а `/brain init` сам подключает MCP;
+  полный протокол сервер отдаёт ресурсом `knowledge://skill/brain`, поэтому копия на
+  диске не устаревает.
 
 ## Чего больше нет
 
@@ -80,8 +81,25 @@ php artisan brain:user --email=owner@example.com --name="Владелец" --pas
 1. Открыть `http://neiro-brain.local/app`, войти созданным пользователем.
 2. **Токены → Выпустить**: выбрать `read` (чтение) или `read + write` (MCP и
    запись через API), скопировать `nb-…` — он показывается один раз.
-3. Подключить MCP (ниже), проверить `search_knowledge`.
-4. Поставить скилл:
+3. Поставить скилл и подключить MCP. Скилл раздаётся публично: токен для скачивания
+   не нужен, иначе первый шаг невыполним.
+
+Windows:
+
+```powershell
+irm http://neiro-brain.local/skill/install.ps1 | iex
+```
+
+macOS и Linux:
+
+```bash
+curl -fsSL http://neiro-brain.local/skill/install.sh | sh
+```
+
+Затем в харнессе — `/brain init` (спросит адрес и токен, поправит конфиг с бэкапом
+и проверит связь), перезапуск харнесса и `/brain doctor`.
+
+У кого есть доступ к серверу — установка без сети:
 
 ```powershell
 php artisan brain:skill            # ~/.agents/skills/brain/SKILL.md
