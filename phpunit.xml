@@ -32,8 +32,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="BRAIN_TOKEN" value="dev-brain-token"/>
-        <env name="BRAIN_PROXY_UPSTREAM" value="mock"/>
+        <env name="BRAIN_DEV_TOKEN" value="dev-brain-token"/>
         <env name="SETTINGS_CACHE_ENABLED" value="false"/>
     </php>
 </phpunit>

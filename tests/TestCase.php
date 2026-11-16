@@ -2,9 +2,12 @@
 
 namespace Tests;
 
+use App\Models\ApiToken;
 use App\Models\User;
+use App\Services\Auth\TokenIssuer;
 use App\Settings\SettingsInitializer;
 use App\Support\OwnerContext;
+use DateTimeInterface;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -28,9 +31,10 @@ abstract class TestCase extends BaseTestCase
 
         try {
             if (Schema::hasTable('users')) {
-                // Знания всегда принадлежат владельцу: тест получает его так же,
-                // как боевой запрос — через OwnerContext.
-                $this->withOwner($this->owner());
+                // Владелец по умолчанию для сервисных тестов. HTTP-тесты
+                // дополнительно вызывают withOwner(): он выпускает токен и
+                // подставляет заголовок, как это сделал бы настоящий клиент.
+                app(OwnerContext::class)->set($this->owner());
             }
         } catch (\Throwable) {
             // Tests without migrations (the landing page) have no users table.
@@ -58,11 +62,41 @@ abstract class TestCase extends BaseTestCase
         );
     }
 
-    /** Поставить другого владельца в контекст запроса. */
+    /**
+     * Поставить владельца в контекст и подставить его личный токен в заголовок.
+     *
+     * Так HTTP-тесты ходят тем же путём, что боевой клиент: без токена
+     * middleware не пустит, а владелец берётся из строки api_tokens.
+     */
     protected function withOwner(User $owner): User
     {
         app(OwnerContext::class)->set($owner);
 
+        $this->withHeader('Authorization', 'Bearer '.$this->issueToken($owner)['plain']);
+
         return $owner;
+    }
+
+    /**
+     * Выпустить токен для теста.
+     *
+     * @param  list<string>  $abilities
+     * @return array{token: ApiToken, plain: string}
+     */
+    protected function issueToken(
+        User $owner,
+        array $abilities = ['read', 'write'],
+        ?DateTimeInterface $expiresAt = null,
+    ): array {
+        return app(TokenIssuer::class)->issue($owner, 'Тестовый токен', $abilities, $expiresAt);
+    }
+
+    /** Заголовки для MCP-запроса с личным токеном. */
+    protected function mcpHeaders(string $plain): array
+    {
+        return [
+            'Authorization' => 'Bearer '.$plain,
+            'Accept' => 'application/json, text/event-stream',
+        ];
     }
 }

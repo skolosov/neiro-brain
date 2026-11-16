@@ -30,7 +30,7 @@ class SettingsTest extends TestCase
 
     public function test_initializer_adds_a_missing_property_next_to_legacy_rows(): void
     {
-        DB::table('settings')->where('group', 'security')->where('name', 'access_token')->delete();
+        DB::table('settings')->where('group', 'security')->where('name', 'mask_emails')->delete();
 
         $now = now();
 
@@ -47,13 +47,13 @@ class SettingsTest extends TestCase
 
         app(SettingsInitializer::class)->ensure();
 
-        $this->assertDatabaseHas('settings', ['group' => 'security', 'name' => 'access_token']);
+        $this->assertDatabaseHas('settings', ['group' => 'security', 'name' => 'mask_emails']);
 
         $security = app(SecuritySettings::class)->refresh();
-        $security->access_token = 'nb-regenerated-token';
+        $security->mask_emails = true;
         $security->save();
 
-        $this->assertSame('nb-regenerated-token', app(SecuritySettings::class)->refresh()->access_token);
+        $this->assertTrue(app(SecuritySettings::class)->refresh()->mask_emails);
     }
 
     public function test_initializer_does_not_re_encrypt_existing_values(): void
@@ -80,17 +80,5 @@ class SettingsTest extends TestCase
         $this->assertStringNotContainsString('sk-live-', (string) $keyPayload);
         $this->assertStringContainsString('eyJpdiI', (string) $keyPayload);
         $this->assertSame('sk-live-abcdefghijklmnopqrstuvwxyz', app(ProxySettings::class)->refresh()->api_key);
-    }
-
-    public function test_access_token_is_encrypted(): void
-    {
-        $security = app(SecuritySettings::class);
-        $security->access_token = 'nb-plain-token';
-        $security->save();
-
-        $payload = DB::table('settings')->where('group', 'security')->where('name', 'access_token')->value('payload');
-
-        $this->assertStringNotContainsString('plain-token', (string) $payload);
-        $this->assertSame('nb-plain-token', app(SecuritySettings::class)->refresh()->access_token);
     }
 }

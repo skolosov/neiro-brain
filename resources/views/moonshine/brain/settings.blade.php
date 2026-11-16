@@ -1,19 +1,8 @@
 @include('moonshine.brain.styles')
 
-@php
-    $reveal = fn (?string $token): string => $token !== null && $token !== '' ? $token : 'не задан';
-    $accessToken = (string) ($security->access_token ?: config('brain.tokens.all'));
-@endphp
-
 <div class="nb-page">
     @if (session('brain_status'))
         <div class="nb-flash">{{ session('brain_status') }}</div>
-    @endif
-    @if (session('brain_generated'))
-        <div class="nb-flash">
-            Новый токен создан. Он действует для прокси, MCP и API — скопируйте его и обновите в харнессе,
-            старое значение больше не действует.
-        </div>
     @endif
 
     @if ($errors->any())
@@ -30,50 +19,13 @@
     <div>
         <h1 class="nb-title">Настройки Neiro Brain</h1>
         <p class="nb-subtitle">
-            Провайдер, ключ и параметры модели приходят из харнесса транзитом.
-            Здесь — токены доступа и настройки самой базы знаний.
+            Настройки самой базы знаний. Личные токены для MCP и API выпускаются
+            в кабинете — у каждого пользователя свои.
         </p>
     </div>
 
     <form method="POST" action="{{ route('brain.admin.settings') }}" class="nb-form">
         @csrf
-
-        <section class="nb-section">
-            <h2>Токен доступа</h2>
-            <p class="nb-help" style="margin-top:0;margin-bottom:1rem">
-                Один токен на всё: <code>X-Neiro-Proxy-Token</code> для <code>/v1/*</code> и
-                <code>Authorization: Bearer</code> для <code>/mcp/knowledge</code> и <code>/api/v1/*</code>.
-                Сгенерируйте свой и скопируйте в харнесс — здесь он больше не показывается полностью.
-            </p>
-
-            <div class="nb-token">
-                <div class="nb-token-head">
-                    <div>
-                        <div class="nb-label" style="margin:0">Токен</div>
-                        <div class="nb-help" style="margin:0">
-                            Действует во всех трёх каналах.
-                        </div>
-                    </div>
-                    <div class="nb-token-value"><code id="nb-token">{{ $reveal($accessToken) }}</code></div>
-                </div>
-                <div class="nb-token-actions">
-                    <button type="button" class="nb-btn nb-btn-secondary" data-copy="nb-token">Скопировать</button>
-                    <button type="submit" class="nb-btn nb-btn-secondary"
-                            formaction="{{ route('brain.admin.tokens.generate') }}"
-                            name="action_generate_token" value="all"
-                            onclick="return confirm('Сгенерировать новый токен? Клиенты перестанут работать, пока вы не обновите токен в них.')">
-                        Сгенерировать новый
-                    </button>
-                </div>
-            </div>
-
-            <div style="margin-top:1rem">
-                <label class="nb-label" for="access_token">Заменить своим значением</label>
-                <input type="text" name="access_token" id="access_token" value="{{ old('access_token') }}" class="nb-input"
-                       placeholder="оставьте пустым, чтобы не менять">
-                <p class="nb-help">Значение попадёт во все три канала сразу.</p>
-            </div>
-        </section>
 
         <section class="nb-section">
             <h2>Память и прокси</h2>
@@ -235,97 +187,3 @@
         </div>
     </form>
 </div>
-
-<script>
-/*
- * Copy a token to the clipboard.
- *
- * navigator.clipboard only exists in a secure context (https or localhost) and
- * rejects when the browser withholds permission; execCommand is kept for
- * exactly those cases. A failure must say so — a button that silently does
- * nothing is what makes this look broken. Clicking the token itself selects it,
- * so Ctrl+C always works even when the clipboard API is unavailable.
- */
-document.addEventListener('click', function (event) {
-    var token = event.target.closest('.nb-token-value code');
-
-    if (token) {
-        var range = document.createRange();
-
-        range.selectNodeContents(token);
-        var selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-    }
-
-    var button = event.target.closest('[data-copy]');
-
-    if (!button) {
-        return;
-    }
-
-    var source = document.getElementById(button.dataset.copy);
-
-    if (!source) {
-        return;
-    }
-
-    var value = source.textContent.trim();
-
-    if (!value || value === 'не задан') {
-        report('Токен не задан — сгенерируйте новый.');
-        return;
-    }
-
-    copyText(value).then(function (ok) {
-        report(ok ? 'Скопировано' : 'Не удалось скопировать — выделите токен и нажмите Ctrl+C');
-    });
-
-    function report(text) {
-        var original = button.dataset.label || button.textContent;
-
-        button.dataset.label = original;
-        button.textContent = text;
-
-        if (text.indexOf('Не удалось') !== 0 && text.indexOf('не задан') === -1) {
-            setTimeout(function () { button.textContent = original; }, 1500);
-        }
-    }
-
-    function copyText(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            return navigator.clipboard.writeText(text).then(function () {
-                return true;
-            }).catch(function () {
-                return legacyCopy(text);
-            });
-        }
-
-        return Promise.resolve(legacyCopy(text));
-    }
-
-    function legacyCopy(text) {
-        var area = document.createElement('textarea');
-
-        area.value = text;
-        area.setAttribute('readonly', '');
-        area.style.position = 'fixed';
-        area.style.top = '-1000px';
-        area.style.opacity = '0';
-        document.body.appendChild(area);
-        area.select();
-
-        var ok = false;
-
-        try {
-            ok = document.execCommand('copy');
-        } catch (error) {
-            ok = false;
-        }
-
-        document.body.removeChild(area);
-
-        return ok;
-    }
-});
-</script>

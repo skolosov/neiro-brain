@@ -8,9 +8,8 @@ use Laravel\Mcp\Facades\Mcp;
 | MCP servers
 |--------------------------------------------------------------------------
 |
-| Web server: POST /mcp/knowledge (bearer token from the admin panel or
-| BRAIN_TOKEN). Local server: `php artisan mcp:start knowledge` for
-| stdio-based harnesses.
+| Web server: POST /mcp/knowledge (personal token from /app/tokens).
+| Local server: `php artisan mcp:start knowledge` for stdio-based harnesses.
 |
 */
 

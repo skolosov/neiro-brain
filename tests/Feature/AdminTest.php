@@ -8,7 +8,6 @@ use App\Enums\KnowledgeKind;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
-use App\Settings\SecuritySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use MoonShine\Laravel\Models\MoonshineUser;
 use Tests\TestCase;
@@ -79,39 +78,11 @@ class AdminTest extends TestCase
             ->get(route('moonshine.page', ['pageUri' => 'settings-page']))
             ->assertOk()
             ->assertSee('Настройки Neiro Brain')
-            ->assertSee('Токен доступа')
+            ->assertDontSee('Токен доступа')
             ->assertSee('Поиск')
             ->assertSee('Суммаризация')
             ->assertSee('Насыщение повторов')
             ->assertDontSee('Upstream');
-    }
-
-    public function test_admin_generates_one_token_for_all_scopes(): void
-    {
-        $this->actingAs($this->admin(), 'moonshine')
-            ->post(route('brain.admin.tokens.generate'))
-            ->assertRedirect();
-
-        $token = app(SecuritySettings::class)->refresh()->access_token;
-
-        $this->assertNotSame('dev-brain-token', $token);
-        $this->assertStringStartsWith('nb-', $token);
-    }
-
-    public function test_generated_token_authorizes_mcp_and_api(): void
-    {
-        $this->actingAs($this->admin(), 'moonshine')
-            ->post(route('brain.admin.tokens.generate'));
-
-        $token = app(SecuritySettings::class)->refresh()->access_token;
-
-        $this->withHeaders(['Authorization' => 'Bearer '.$token])
-            ->getJson('/api/v1/stats')
-            ->assertOk();
-
-        $this->withHeaders(['Authorization' => 'Bearer dev-brain-token'])
-            ->getJson('/api/v1/stats')
-            ->assertUnauthorized();
     }
 
     public function test_guest_is_redirected_from_admin(): void

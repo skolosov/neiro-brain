@@ -93,15 +93,6 @@ final class SettingsInitializer
             }
         }
 
-        if ($settingsClass === ProxySettings::class) {
-            $defaults['upstream'] = (string) config('brain.proxy.upstream', $defaults['upstream']);
-            $defaults['base_url'] = (string) config('brain.proxy.base_url', $defaults['base_url']);
-        }
-
-        if ($settingsClass === SecuritySettings::class) {
-            $defaults['access_token'] = (string) config('brain.tokens.all', $defaults['access_token']);
-        }
-
         return $defaults;
     }
 }

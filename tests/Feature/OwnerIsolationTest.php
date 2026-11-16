@@ -23,9 +23,9 @@ use Tests\TestCase;
 /**
  * Инварианты владельца знаний.
  *
- * Пока токен один, но карточка уже принадлежит пользователю: чужой id не
- * читается, не удаляется и не находится поиском, а одинаковый текст у двух
- * владельцев — две карточки, а не одна.
+ * Карточка принадлежит пользователю: чужой id не читается, не удаляется и не
+ * находится поиском, а одинаковый текст у двух владельцев — две карточки,
+ * а не одна. HTTP-запросы идут с личным токеном владельца.
  */
 class OwnerIsolationTest extends TestCase
 {
@@ -185,13 +185,14 @@ class OwnerIsolationTest extends TestCase
     /** API не отдаёт чужую карточку по id: вместо этого 404. */
     public function test_api_show_returns_404_for_a_foreign_card(): void
     {
-        // Владелец API до пасса 3 — первый активный пользователь, его же
-        // ставит middleware. Карточку пишем от второго владельца.
+        // Карточку пишет второй владелец, запрос идёт с токеном первого:
+        // владелец API теперь всегда берётся из токена.
         $this->withOwner($this->secondOwner());
         $foreign = $this->write('Чужая карточка', 'Эта карточка принадлежит второму владельцу.');
 
-        $this->withHeaders(['Authorization' => 'Bearer dev-brain-token'])
-            ->getJson('/api/v1/entries/'.$foreign->id)
+        $this->withOwner($this->owner());
+
+        $this->getJson('/api/v1/entries/'.$foreign->id)
             ->assertNotFound();
     }
 }

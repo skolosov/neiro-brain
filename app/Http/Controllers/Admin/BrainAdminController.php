@@ -14,7 +14,6 @@ use App\Settings\SettingsInitializer;
 use App\Settings\SyncSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class BrainAdminController extends Controller
 {
@@ -23,19 +22,6 @@ class BrainAdminController extends Controller
         $count = $indexer->indexAll();
 
         return back()->with('brain_status', sprintf('Переиндексировано записей: %d.', $count));
-    }
-
-    public function generateToken(): RedirectResponse
-    {
-        app(SettingsInitializer::class)->ensure();
-
-        $token = 'nb-'.Str::random(40);
-
-        $security = app(SecuritySettings::class);
-        $security->access_token = $token;
-        $security->save();
-
-        return back()->with('brain_generated', 'access');
     }
 
     public function updateSettings(Request $request): RedirectResponse
@@ -58,7 +44,6 @@ class BrainAdminController extends Controller
             'retrieval_freshness_weight' => ['required', 'numeric', 'min:0', 'max:1'],
             'retrieval_importance_weight' => ['required', 'numeric', 'min:0', 'max:0.5'],
             'proxy_enabled' => ['nullable', 'boolean'],
-            'access_token' => ['nullable', 'string', 'max:255'],
             'proxy_inject_memory' => ['nullable', 'boolean'],
             'proxy_capture' => ['nullable', 'boolean'],
             'proxy_top_k' => ['required', 'integer', 'min:1', 'max:20'],
@@ -103,8 +88,6 @@ class BrainAdminController extends Controller
         $proxy->top_k = (int) $validated['proxy_top_k'];
         $proxy->max_context_chars = (int) $validated['proxy_max_context_chars'];
 
-        $newToken = (string) ($validated['access_token'] ?? '');
-
         $proxy->save();
 
         $sync = app(SyncSettings::class);
@@ -118,11 +101,6 @@ class BrainAdminController extends Controller
         $security = app(SecuritySettings::class);
         $security->mask_secrets = $request->boolean('security_mask_secrets');
         $security->mask_emails = $request->boolean('security_mask_emails');
-
-        if ($newToken !== '') {
-            $security->access_token = $newToken;
-        }
-
         $security->save();
 
         return back()->with('brain_status', 'Настройки сохранены.');

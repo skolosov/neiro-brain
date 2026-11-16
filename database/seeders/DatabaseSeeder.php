@@ -34,19 +34,23 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Владелец знаний. Идемпотентно: повторный запуск находит пользователя по
-     * email и не трогает его пароль.
+     * email, обновляет имя и пароль (демо-доступ для локальной разработки) и
+     * не создаёт дубль. Админка связывается с ним в seedAdmin().
      */
     private function seedOwner(): User
     {
         $email = (string) config('brain.demo.admin_email');
 
-        return User::query()->firstOrCreate(
+        $owner = User::query()->updateOrCreate(
             ['email' => $email],
             [
                 'name' => 'Neiro Brain Admin',
                 'password' => Hash::make((string) config('brain.demo.admin_password')),
+                'is_active' => true,
             ],
         );
+
+        return $owner;
     }
 
     private function seedAdmin(User $owner): void
