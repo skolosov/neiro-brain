@@ -35,8 +35,8 @@ class LandingTest extends TestCase
 
     public function test_config_url_is_built_not_hardcoded(): void
     {
-        // В тестах APP_URL = http://neiro-brain.local, поэтому захардкоженный
-        // localhost сразу выдаст себя: в конфиге должен стоять адрес от App URL.
+        // url() берёт адрес из запроса, поэтому захардкоженный localhost сразу
+        // выдаст себя: страница обязана показывать тот хост, с которого открыта.
         $this->get('/')
             ->assertOk()
             ->assertSee(url('/mcp/knowledge'), false)
