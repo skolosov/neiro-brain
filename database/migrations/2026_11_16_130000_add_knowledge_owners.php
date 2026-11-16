@@ -114,7 +114,7 @@ return new class extends Migration
 
     private function resolveOwnerId(): int
     {
-        $admin = DB::table('moonshine_users')->orderBy('id')->first(['id', 'email', 'name']);
+        $admin = DB::table('moonshine_users')->orderBy('id')->first(['id', 'email', 'name', 'password']);
 
         if ($admin !== null && is_string($admin->email) && $admin->email !== '') {
             $existing = DB::table('users')->where('email', $admin->email)->value('id');
@@ -123,10 +123,16 @@ return new class extends Migration
                 return (int) $existing;
             }
 
+            // Пароль берём из админки: у человека должен быть один пароль на
+            // кабинет и админку, иначе после миграции он не войдёт в кабинет.
+            $password = is_string($admin->password ?? null) && $admin->password !== ''
+                ? $admin->password
+                : Hash::make(Str::random(40));
+
             return (int) DB::table('users')->insertGetId([
                 'name' => (string) ($admin->name !== '' ? $admin->name : 'Владелец знаний'),
                 'email' => $admin->email,
-                'password' => Hash::make(Str::random(40)),
+                'password' => $password,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

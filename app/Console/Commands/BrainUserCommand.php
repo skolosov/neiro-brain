@@ -89,6 +89,8 @@ class BrainUserCommand extends Command
 
         if ($this->option('admin')) {
             $this->linkAdmin($user, $password);
+        } elseif ($password !== '') {
+            $this->syncAdminPassword($user, $password);
         }
 
         $this->info($existing === null
@@ -159,9 +161,9 @@ class BrainUserCommand extends Command
         $admin->name = $user->name;
         $admin->moonshine_user_role_id = $admin->moonshine_user_role_id ?: 1;
 
-        if (! $admin->exists) {
-            $admin->password = Hash::make($password !== '' ? $password : Str::random(40));
-        }
+        // Пароль админки всегда повторяет пароль кабинета: два разных пароля
+        // у одного человека — это гарантированная путаница при входе.
+        $admin->password = $password !== '' ? Hash::make($password) : ($admin->password ?: Hash::make(Str::random(40)));
 
         $admin->save();
 
@@ -170,5 +172,24 @@ class BrainUserCommand extends Command
             ->update(['user_id' => $user->getKey()]);
 
         $this->line('Доступ в админку MoonShine: '.$user->email);
+    }
+
+    /**
+     * Уже существующая админка должна принимать тот же пароль, что и кабинет,
+     * даже если команду запускали без --admin.
+     */
+    private function syncAdminPassword(User $user, string $password): void
+    {
+        $updated = DB::table('moonshine_users')
+            ->where('email', $user->email)
+            ->update([
+                'password' => Hash::make($password),
+                'user_id' => $user->getKey(),
+                'updated_at' => now(),
+            ]);
+
+        if ($updated > 0) {
+            $this->line('Пароль админки MoonShine обновлён тем же значением.');
+        }
     }
 }

@@ -109,4 +109,51 @@ class UserCommandTest extends TestCase
 
         $this->assertSame($user->getKey(), (int) $admin->user_id);
     }
+
+    /**
+     * У человека один пароль на кабинет и админку: иначе он входит в одну
+     * дверь и не может войти в соседнюю, хотя пароль «верный».
+     */
+    public function test_password_is_the_same_for_cabinet_and_admin(): void
+    {
+        $this->artisan('brain:user', [
+            '--email' => 'boss@example.test',
+            '--name' => 'Босс',
+            '--password' => 'first-pass',
+            '--admin' => true,
+        ])->assertSuccessful();
+
+        $this->artisan('brain:user', [
+            '--email' => 'boss@example.test',
+            '--password' => 'second-pass',
+        ])->assertSuccessful();
+
+        $user = User::query()->where('email', 'boss@example.test')->firstOrFail();
+        $admin = MoonshineUser::query()->where('email', 'boss@example.test')->firstOrFail();
+
+        $this->assertTrue(Hash::check('second-pass', $user->password));
+        $this->assertTrue(Hash::check('second-pass', $admin->password));
+        $this->assertSame((int) $admin->user_id, (int) $user->getKey());
+    }
+
+    public function test_resetting_a_password_also_updates_an_linked_admin(): void
+    {
+        $this->artisan('brain:user', [
+            '--email' => 'old@example.test',
+            '--name' => 'Старый админ',
+            '--password' => 'old-pass',
+            '--admin' => true,
+        ])->assertSuccessful();
+
+        $this->artisan('brain:user', [
+            '--email' => 'old@example.test',
+            '--password' => 'new-pass',
+            '--admin' => true,
+        ])->assertSuccessful();
+
+        $admin = MoonshineUser::query()->where('email', 'old@example.test')->firstOrFail();
+
+        $this->assertTrue(Hash::check('new-pass', $admin->password));
+        $this->assertFalse(Hash::check('old-pass', $admin->password));
+    }
 }
