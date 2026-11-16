@@ -10,6 +10,7 @@ use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\GraphData;
 use App\Services\Brain\Dto\GraphEdge;
 use App\Services\Brain\Dto\GraphNode;
+use App\Support\OwnerContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -259,11 +260,16 @@ final class BrainGraph
             return [];
         }
 
+        $context = app(OwnerContext::class);
+
         $terms = DB::table('knowledge_terms as t')
             ->join('knowledge_chunks as c', 'c.id', '=', 't.chunk_id')
             ->join('knowledge_entries as e', 'e.id', '=', 'c.entry_id')
             ->whereIn('c.entry_id', $entryIds)
             ->where('e.status', EntryStatus::Approved->value)
+            // Сырой запрос не видит глобальный скоуп модели, поэтому владельца
+            // ограничиваем здесь явно — по чужим терминам граф не строится.
+            ->when($context->has(), fn ($query) => $query->where('e.owner_id', $context->id()))
             ->groupBy('t.term')
             ->havingRaw('COUNT(DISTINCT c.entry_id) BETWEEN 2 AND '.self::KEYWORD_MAX_ENTRIES)
             ->orderByRaw('COUNT(DISTINCT c.entry_id) DESC')

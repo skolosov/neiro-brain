@@ -7,6 +7,8 @@ namespace App\Models;
 use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
 use App\Enums\KnowledgeScope;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use LogicException;
 
 class KnowledgeEntry extends Model
 {
@@ -36,7 +39,35 @@ class KnowledgeEntry extends Model
             }
         });
 
+        // Владелец из контекста запроса. Если контекста нет (админка MoonShine,
+        // миграции, консоль без --user), скоуп не накладывается: админка
+        // осознанно видит и правит все карточки. MCP, API и команды контекст
+        // ставят всегда, поэтому их выборки ограничены владельцем.
+        static::addGlobalScope('owner', function (Builder $builder): void {
+            $context = app(OwnerContext::class);
+
+            if ($context->has()) {
+                $builder->where($builder->getModel()->qualifyColumn('owner_id'), $context->id());
+            }
+        });
+
         static::creating(function (KnowledgeEntry $entry): void {
+            if ($entry->owner_id === null) {
+                // Пишущий код (KnowledgeWriter) берёт владельца из контекста сам.
+                // Здесь — последний рубеж для админки и сидера: владелец тот же,
+                // кого вернул бы OwnerContext, иначе запись невозможна.
+                $entry->owner_id = app(OwnerContext::class)->has()
+                    ? app(OwnerContext::class)->id()
+                    : app(OwnerResolver::class)->resolve()?->getKey();
+
+                if ($entry->owner_id === null) {
+                    throw new LogicException(
+                        'Нельзя создать карточку знаний без владельца: контекст пуст, '
+                        .'а в базе нет активного пользователя.',
+                    );
+                }
+            }
+
             if (empty($entry->content_hash)) {
                 $normalized = mb_strtolower(preg_replace('/\s+/u', ' ', (string) $entry->content) ?? (string) $entry->content);
                 $hash = hash('sha256', $normalized);
@@ -157,6 +188,22 @@ class KnowledgeEntry extends Model
     }
 
     /**
+     * Явное ограничение выборки одним владельцем.
+     *
+     * Глобальный скоуп делает это для контекста запроса, но есть места, где
+     * владелец известен напрямую: дедуп в KnowledgeWriter, поиск по id в API,
+     * команды. Там лучше сказать это вслух, чем полагаться на невидимое
+     * состояние контейнера.
+     */
+    public function scopeOwnedBy(Builder $query, User|int $owner): Builder
+    {
+        return $query->where(
+            $query->getModel()->qualifyColumn('owner_id'),
+            $owner instanceof User ? $owner->getKey() : $owner,
+        );
+    }
+
+    /**
      * Current cards only. A superseded row is history: the newer version says
      * the same thing better, and handing both to the model produces contradictions.
      */
@@ -203,10 +250,9 @@ class KnowledgeEntry extends Model
 
     public function scopeSearchable(Builder $query): Builder
     {
-        return $query->whereIn('status', [
-            EntryStatus::Approved->value,
-            EntryStatus::Draft->value,
-        ]);
+        // В потоке больше нет черновиков: карточка либо опубликована, либо
+        // в архиве, а архив в поиск не попадает.
+        return $query->where('status', EntryStatus::Approved->value);
     }
 
     public function scopeForProject(Builder $query, ?string $project): Builder

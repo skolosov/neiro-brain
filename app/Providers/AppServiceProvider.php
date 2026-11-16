@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\KnowledgeEntry;
 use App\Observers\KnowledgeEntryObserver;
+use App\Support\OwnerContext;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +17,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Владелец знаний живёт один запрос (или одну консольную команду):
+        // так его невозможно унести в соседний запрос и перепутать.
+        $this->app->scoped(OwnerContext::class, fn (): OwnerContext => new OwnerContext);
     }
 
     /**

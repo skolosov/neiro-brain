@@ -14,6 +14,8 @@ use App\Mcp\Tools\ProjectContextTool;
 use App\Mcp\Tools\RecentKnowledgeTool;
 use App\Mcp\Tools\RememberKnowledgeTool;
 use App\Mcp\Tools\SearchKnowledgeTool;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -53,4 +55,24 @@ class KnowledgeServer extends Server
     protected array $prompts = [
         AboutMePrompt::class,
     ];
+
+    /**
+     * Локальный MCP (`php artisan mcp:start knowledge`) не проходит через
+     * HTTP-middleware, поэтому владельца ставим здесь. Для веб-входа контекст
+     * уже выставлен VerifyBrainToken, и этот код ничего не меняет.
+     */
+    protected function boot(): void
+    {
+        $context = app(OwnerContext::class);
+
+        if ($context->has()) {
+            return;
+        }
+
+        $owner = app(OwnerResolver::class)->resolve();
+
+        if ($owner !== null) {
+            $context->set($owner);
+        }
+    }
 }

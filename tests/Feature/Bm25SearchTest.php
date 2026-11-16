@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
+use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\KnowledgeSearch;
@@ -68,23 +69,17 @@ class Bm25SearchTest extends TestCase
         $this->assertSame('Sklad', $result->hits[0]->entry->project);
     }
 
-    public function test_drafts_are_excluded_by_default(): void
+    public function test_archived_cards_are_excluded_from_search(): void
     {
-        app(KnowledgeWriter::class)->write(
-            new ExtractedEntry(
-                kind: KnowledgeKind::Fact,
-                title: 'Черновик',
-                content: 'Уникальное слово черновик',
-            ),
-            EntryStatus::Draft,
-        );
+        $id = $this->write('Архив', 'Уникальное слово архив');
 
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик'));
+        $entry = KnowledgeEntry::query()->find($id);
+        $this->assertNotNull($entry);
+        $entry->forceFill(['status' => EntryStatus::Archived->value])->save();
+
+        $result = app(KnowledgeSearch::class)->search(new SearchQuery('архив'));
 
         $this->assertTrue($result->isEmpty());
-
-        $result = app(KnowledgeSearch::class)->search(new SearchQuery('черновик', includeDrafts: true));
-        $this->assertFalse($result->isEmpty());
     }
 
     public function test_russian_morphology_matches(): void

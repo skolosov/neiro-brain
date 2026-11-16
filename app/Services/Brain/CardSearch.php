@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Brain;
 
+use App\Enums\EntryStatus;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\SearchHit;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\Dto\SearchResult;
+use App\Support\OwnerContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -51,6 +53,7 @@ final class CardSearch
 
     /**
      * @param  list<string>  $kinds
+     * @param  bool  $includeDrafts  Оставлен для совместимости: черновиков больше нет, архив в выдачу не попадает.
      * @return array{
      *     cards: list<array<string, mixed>>,
      *     took_ms: int,
@@ -68,7 +71,7 @@ final class CardSearch
         $query = trim($query);
 
         if ($query === '') {
-            return $this->browse($project, $kinds, $limit, $includeDrafts);
+            return $this->browse($project, $kinds, $limit);
         }
 
         $searchQuery = new SearchQuery(
@@ -102,10 +105,11 @@ final class CardSearch
      * @param  list<string>  $kinds
      * @return array{cards: list<array<string, mixed>>, took_ms: int, terms: list<string>, empty_reason: string|null}
      */
-    private function browse(?string $project, array $kinds, int $limit, bool $includeDrafts): array
+    private function browse(?string $project, array $kinds, int $limit): array
     {
         $entries = KnowledgeEntry::query()
-            ->when(! $includeDrafts, fn ($query) => $query->approved())
+            // Архив — отдельный механизм: в выдаче карточек его нет.
+            ->approved()
             ->forProject($project)
             ->ofKinds($kinds)
             ->orderByDesc('importance')
@@ -321,8 +325,12 @@ final class CardSearch
      */
     public function tagCloud(int $limit = 40): Collection
     {
+        $context = app(OwnerContext::class);
+
         $rows = DB::table('knowledge_entries')
-            ->whereIn('status', ['approved', 'draft'])
+            ->where('status', EntryStatus::Approved->value)
+            // Сырой запрос: глобальный скоуп модели здесь не работает.
+            ->when($context->has(), fn ($query) => $query->where('owner_id', $context->id()))
             ->whereNotNull('tags')
             ->pluck('tags');
 

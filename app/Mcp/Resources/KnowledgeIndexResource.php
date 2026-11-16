@@ -46,8 +46,9 @@ class KnowledgeIndexResource extends Resource
         return Response::json([
             'stats' => [
                 'entries' => KnowledgeEntry::query()->approved()->count(),
-                'drafts' => KnowledgeEntry::query()->where('status', 'draft')->count(),
-                'chunks' => KnowledgeChunk::query()->count(),
+                // Чанки считаем через карточки: у связи действуют глобальные
+                // скоупы владельца и актуальности.
+                'chunks' => KnowledgeChunk::query()->whereHas('entry')->count(),
             ],
             'projects' => $projects,
             'recent' => $recent->map(fn (KnowledgeEntry $entry): array => [

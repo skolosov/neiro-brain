@@ -6,6 +6,8 @@ namespace App\Http\Middleware;
 
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,20 +49,48 @@ class VerifyBrainToken
         $addressToken = trim((string) ($request->route('brainToken') ?? $request->getUser() ?? ''));
 
         if ($addressToken !== '' && $this->matches($expected, $addressToken)) {
-            return $next($request);
+            return $this->proceed($request, $next);
         }
 
         if ($provided !== '' && $this->matches($expected, $provided)) {
-            return $next($request);
+            return $this->proceed($request, $next);
         }
 
         // Прозрачный прокси: вместо токена Neiro Brain клиент прислал ключ
         // провайдера (sk-…), сервер его не хранит, а передаёт upstream.
         if ($scope === 'proxy' && (bool) config('brain.proxy.open', false) && $this->looksLikeProviderKey($provided)) {
-            return $next($request);
+            return $this->proceed($request, $next);
         }
 
         return $this->unauthorized($request, $scope, $addressToken !== '');
+    }
+
+    /**
+     * Токен проверен — ставим владельца знаний в контекст запроса.
+     *
+     * Пока токен один, владелец один и берётся из OwnerResolver (первый
+     * активный пользователь). Если владельца нет, отвечаем 503: без него
+     * читать и записывать знания некуда, а пускать запрос «во все владельцы»
+     * нельзя.
+     */
+    private function proceed(Request $request, Closure $next): Response
+    {
+        $owner = app(OwnerResolver::class)->resolve();
+
+        if ($owner === null) {
+            return response()->json([
+                'error' => [
+                    'type' => 'owner_unavailable',
+                    'code' => 'no_owner',
+                    'message' => 'В базе нет активного пользователя — владельца знаний. '
+                        .'Создайте пользователя (php artisan db:seed) и повторите запрос.',
+                ],
+            ], 503);
+        }
+
+        app(OwnerContext::class)->set($owner);
+
+        return $next($request);
     }
 
     private function looksLikeProviderKey(string $token): bool

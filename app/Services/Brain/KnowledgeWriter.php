@@ -7,15 +7,19 @@ namespace App\Services\Brain;
 use App\Enums\EntryStatus;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\ExtractedEntry;
+use App\Support\OwnerContext;
+use LogicException;
 
 final class KnowledgeWriter
 {
     public function __construct(
         private readonly SecretMasker $masker,
         private readonly Indexer $indexer,
+        private readonly OwnerContext $owners,
     ) {}
 
     /**
+     * @param  EntryStatus|null  $status  Оставлен для совместимости вызовов: запись всегда approved.
      * @param  array<string, mixed>  $metadata
      * @return array{entry: KnowledgeEntry, created: bool}|null
      */
@@ -24,6 +28,10 @@ final class KnowledgeWriter
         ?EntryStatus $status = null,
         array $metadata = [],
     ): ?array {
+        // Владелец — только из контекста запроса. Пустой контекст — ошибка:
+        // иначе карточка досталась бы случайному пользователю.
+        $ownerId = $this->owners->id();
+
         $title = $this->masker->mask($data->title)->text;
         $content = $this->masker->mask($data->content)->text;
         $details = $data->details !== null ? $this->masker->mask($data->details)->text : null;
@@ -42,7 +50,10 @@ final class KnowledgeWriter
 
         $normalized = mb_strtolower(preg_replace('/\s+/u', ' ', $content) ?? $content);
         $hash = hash('sha256', $normalized);
-        $existing = KnowledgeEntry::query()->where('content_hash', $hash)->first();
+        $existing = KnowledgeEntry::query()
+            ->ownedBy($ownerId)
+            ->where('content_hash', $hash)
+            ->first();
 
         if ($existing !== null) {
             $existing->tags = array_values(array_unique([...($existing->tags ?? []), ...$data->tags]));
@@ -56,8 +67,10 @@ final class KnowledgeWriter
         }
 
         $entry = KnowledgeEntry::query()->create([
+            'owner_id' => $ownerId,
             'kind' => $data->kind->value,
-            'status' => ($status ?? EntryStatus::Approved)->value,
+            // Запись всегда опубликована: черновиков в потоке больше нет.
+            'status' => EntryStatus::Approved->value,
             'title' => $title,
             'content' => $content,
             'summary' => $data->summary !== null ? $this->masker->mask($data->summary)->text : Text::limit($content, 300),
@@ -97,6 +110,12 @@ final class KnowledgeWriter
 
         if ($new === null) {
             return $old;
+        }
+
+        // Новая версия принадлежит тому же владельцу, что и старая: подменить
+        // чужую карточку нельзя даже зная её id.
+        if ((int) $old->owner_id !== (int) $new['entry']->owner_id) {
+            throw new LogicException('Нельзя заменить карточку другого владельца.');
         }
 
         $old->forceFill(['superseded_by' => $new['entry']->getKey()])->save();

@@ -4,28 +4,43 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ResolvesOwnerOption;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeEntry;
-use App\Models\KnowledgeTerm;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 class BrainStatsCommand extends Command
 {
-    protected $signature = 'brain:stats';
+    use ResolvesOwnerOption;
 
-    protected $description = 'Show knowledge base statistics';
+    protected $signature = 'brain:stats
+        {--user= : Владелец знаний: id или email (обязательно)}';
 
-    public function handle(): int
+    protected $description = 'Show knowledge base statistics for one owner';
+
+    public function handle(OwnerContext $context, OwnerResolver $resolver): int
     {
+        if (! $this->setOwnerFromOption($resolver, $context)) {
+            return self::FAILURE;
+        }
+
+        // Скоупы модели уже ограничивают карточки владельцем; чанки и термины
+        // считаем через них, чтобы счётчики не захватили чужой индекс.
+        $entryIds = fn () => KnowledgeEntry::query()->select('id');
+        $chunkIds = fn () => KnowledgeChunk::query()->whereIn('entry_id', $entryIds())->select('id');
+
         $this->table(
             ['Metric', 'Value'],
             [
+                ['Owner', $context->owner()->email],
                 ['Knowledge entries', KnowledgeEntry::query()->count()],
                 ['Approved entries', KnowledgeEntry::query()->approved()->count()],
-                ['Chunks', KnowledgeChunk::query()->count()],
-                ['Indexed terms (rows)', KnowledgeTerm::query()->count()],
-                ['Unique terms', DB::table('knowledge_terms')->distinct()->count('term')],
+                ['Chunks', KnowledgeChunk::query()->whereIn('entry_id', $entryIds())->count()],
+                ['Indexed terms (rows)', DB::table('knowledge_terms')->whereIn('chunk_id', $chunkIds())->count()],
+                ['Unique terms', DB::table('knowledge_terms')->whereIn('chunk_id', $chunkIds())->distinct()->count('term')],
                 ['Database size', $this->databaseSize()],
             ],
         );

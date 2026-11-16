@@ -4,20 +4,34 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ResolvesOwnerOption;
 use App\Services\Brain\Indexer;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Illuminate\Console\Command;
 
 class BrainReindexCommand extends Command
 {
-    protected $signature = 'brain:reindex';
+    use ResolvesOwnerOption;
 
-    protected $description = 'Rebuild the BM25 index for every knowledge entry';
+    protected $signature = 'brain:reindex
+        {--user= : Владелец знаний: id или email (обязательно)}';
 
-    public function handle(Indexer $indexer): int
+    protected $description = 'Rebuild the BM25 index for every knowledge entry of one owner';
+
+    public function handle(Indexer $indexer, OwnerContext $context, OwnerResolver $resolver): int
     {
+        if (! $this->setOwnerFromOption($resolver, $context)) {
+            return self::FAILURE;
+        }
+
         $count = $indexer->indexAll();
 
-        $this->components->info(sprintf('Reindexed %d entries.', $count));
+        $this->components->info(sprintf(
+            'Reindexed %d entries of %s.',
+            $count,
+            $context->owner()->email,
+        ));
 
         return self::SUCCESS;
     }

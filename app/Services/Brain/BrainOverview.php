@@ -7,6 +7,7 @@ namespace App\Services\Brain;
 use App\Enums\EntryStatus;
 use App\Models\KnowledgeChunk;
 use App\Models\KnowledgeEntry;
+use App\Support\OwnerContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -39,12 +40,13 @@ final class BrainOverview
         return [
             'total' => $total,
             'approved' => $approved,
-            'drafts' => (clone $entries)->where('status', EntryStatus::Draft->value)->count(),
             'indexed' => $indexed,
             'indexed_share' => $total > 0 ? (int) round($indexed / max(1, $approved) * 100) : 0,
             'projects' => (clone $published)->whereNotNull('project')->where('project', '!=', '')->distinct('project')->count('project'),
             'topics' => $this->topics->counts(12),
-            'chunks' => KnowledgeChunk::query()->count(),
+            // Чанки принадлежат карточкам: без фильтра по владельцу в счёт
+            // попал бы чужой индекс.
+            'chunks' => KnowledgeChunk::query()->whereHas('entry')->count(),
             'series' => $this->series(),
             'projectsCards' => $this->projectCards(),
             'recent' => KnowledgeEntry::query()
@@ -64,8 +66,11 @@ final class BrainOverview
     {
         $start = now()->startOfWeek()->subWeeks($weeks - 1);
 
+        $context = app(OwnerContext::class);
+
         $rows = DB::table('knowledge_entries')
-            ->whereIn('status', [EntryStatus::Approved->value, EntryStatus::Draft->value])
+            ->where('status', EntryStatus::Approved->value)
+            ->when($context->has(), fn ($query) => $query->where('owner_id', $context->id()))
             ->where(function ($query) use ($start): void {
                 $query->where('occurred_at', '>=', $start)->orWhere('created_at', '>=', $start);
             })

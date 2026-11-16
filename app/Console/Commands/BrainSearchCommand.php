@@ -4,22 +4,32 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ResolvesOwnerOption;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\KnowledgeSearch;
 use App\Services\Brain\Text;
+use App\Support\OwnerContext;
+use App\Support\OwnerResolver;
 use Illuminate\Console\Command;
 
 class BrainSearchCommand extends Command
 {
+    use ResolvesOwnerOption;
+
     protected $signature = 'brain:search
         {query : Search phrase}
+        {--user= : Владелец знаний: id или email (обязательно)}
         {--project= : Filter by project}
         {--limit=8 : Number of results}';
 
     protected $description = 'Search the Neiro Brain knowledge base with BM25';
 
-    public function handle(KnowledgeSearch $search): int
+    public function handle(KnowledgeSearch $search, OwnerContext $context, OwnerResolver $resolver): int
     {
+        if (! $this->setOwnerFromOption($resolver, $context)) {
+            return self::FAILURE;
+        }
+
         $result = $search->search(new SearchQuery(
             query: (string) $this->argument('query'),
             project: $this->option('project') ?: null,
@@ -27,7 +37,8 @@ class BrainSearchCommand extends Command
         ));
 
         $this->line(sprintf(
-            'Query: %s | terms: %s | candidates: %d | %d ms',
+            'Owner: %s | query: %s | terms: %s | candidates: %d | %d ms',
+            $context->owner()->email,
             $result->query,
             implode(', ', $result->terms),
             $result->candidates,

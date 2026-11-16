@@ -23,7 +23,7 @@
         <div class="nb-card">
             <div class="nb-metric-label">Карточек</div>
             <div class="nb-metric-value">{{ $total }}</div>
-            <div class="nb-metric-hint">{{ $approved }} подтверждено · {{ $drafts }} черновиков</div>
+            <div class="nb-metric-hint">{{ $approved }} подтверждено</div>
         </div>
         <div class="nb-card">
             <div class="nb-metric-label">Проектов</div>

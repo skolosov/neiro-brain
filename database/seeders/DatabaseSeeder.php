@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
 use App\Models\KnowledgeEntry;
+use App\Models\User;
 use App\Services\Brain\Dto\ExtractedEntry;
 use App\Services\Brain\KnowledgeWriter;
 use App\Settings\SettingsInitializer;
+use App\Support\OwnerContext;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use MoonShine\Laravel\Models\MoonshineUser;
 
@@ -19,16 +21,40 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         app(SettingsInitializer::class)->ensure();
-        $this->seedAdmin();
+
+        $owner = $this->seedOwner();
+        $this->seedAdmin($owner);
+
+        // Сидер пишет демо-карточки тем же KnowledgeWriter, что MCP и API,
+        // поэтому владельца нужно положить в контекст.
+        app(OwnerContext::class)->set($owner);
+
         $this->seedKnowledge();
     }
 
-    private function seedAdmin(): void
+    /**
+     * Владелец знаний. Идемпотентно: повторный запуск находит пользователя по
+     * email и не трогает его пароль.
+     */
+    private function seedOwner(): User
+    {
+        $email = (string) config('brain.demo.admin_email');
+
+        return User::query()->firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => 'Neiro Brain Admin',
+                'password' => Hash::make((string) config('brain.demo.admin_password')),
+            ],
+        );
+    }
+
+    private function seedAdmin(User $owner): void
     {
         $email = (string) config('brain.demo.admin_email');
         $password = (string) config('brain.demo.admin_password');
 
-        MoonshineUser::query()->updateOrCreate(
+        $admin = MoonshineUser::query()->updateOrCreate(
             ['email' => $email],
             [
                 'name' => 'Neiro Brain Admin',
@@ -36,6 +62,12 @@ class DatabaseSeeder extends Seeder
                 'moonshine_user_role_id' => 1,
             ],
         );
+
+        // Связь админки с владельцем знаний. Пишем через query builder, чтобы
+        // не перехешировать пароль админа повторным save().
+        DB::table('moonshine_users')
+            ->where('id', $admin->getKey())
+            ->update(['user_id' => $owner->getKey()]);
 
         $this->command?->info('Admin: '.$email.' / '.$password);
     }
@@ -84,7 +116,7 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($entries as $entry) {
-            $writer->write($entry, EntryStatus::Approved, ['engine' => 'demo']);
+            $writer->write($entry, null, ['engine' => 'demo']);
         }
 
         $existing = KnowledgeEntry::query()->where('title', 'Короткие ответы без воды')->first();

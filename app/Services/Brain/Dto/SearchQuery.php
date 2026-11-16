@@ -8,6 +8,7 @@ final readonly class SearchQuery
 {
     /**
      * @param  list<string>  $kinds
+     * @param  bool  $includeDrafts  Оставлен для совместимости вызовов: черновиков в потоке больше нет.
      */
     public function __construct(
         public string $query,

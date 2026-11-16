@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Brain;
 
+use App\Enums\EntryStatus;
 use App\Models\KnowledgeEntry;
 use App\Services\Brain\Dto\SearchHit;
 use App\Services\Brain\Dto\SearchQuery;
 use App\Services\Brain\Dto\SearchResult;
 use App\Settings\RetrievalSettings;
+use App\Support\OwnerContext;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -38,13 +40,20 @@ final class Bm25Search
             return new SearchResult($query->query, [], [], 0, 0);
         }
 
-        $statuses = $query->includeDrafts || $this->settings->include_drafts
-            ? ['approved', 'draft']
-            : ['approved'];
+        // В потоке остались только опубликованные карточки: архив живёт своей
+        // жизнью и в поиск не попадает.
+        $statuses = [EntryStatus::Approved->value];
 
+        $context = app(OwnerContext::class);
+        $ownerId = $context->has() ? $context->id() : null;
+
+        // Владелец фильтруется ВНУТРИ $base: N, avgdl и df считаются по корпусу
+        // одного владельца. Иначе чужой корпус раздувал бы N и менял IDF, а
+        // редкий термин соседа влиял бы на наши оценки.
         $base = fn () => DB::table('knowledge_chunks as c')
             ->join('knowledge_entries as e', 'e.id', '=', 'c.entry_id')
             ->whereIn('e.status', $statuses)
+            ->when($ownerId !== null, fn ($builder) => $builder->where('e.owner_id', $ownerId))
             ->when($query->project !== null && $query->project !== '', fn ($builder) => $builder->where('e.project', $query->project))
             ->when($query->kinds !== [], fn ($builder) => $builder->whereIn('e.kind', $query->kinds));
 

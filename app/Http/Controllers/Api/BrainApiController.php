@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\EntryStatus;
 use App\Enums\KnowledgeKind;
 use App\Http\Controllers\Controller;
 use App\Models\KnowledgeEntry;
@@ -51,9 +50,20 @@ class BrainApiController extends Controller
         ]);
     }
 
-    public function show(KnowledgeEntry $entry): JsonResponse
+    /**
+     * Карточка по id. Ищем явно через модель, а не route-model binding: на
+     * модели висит скоуп владельца из контекста запроса, поэтому чужой id
+     * честно даёт 404, а не отдаёт карточку по угаданному номеру.
+     */
+    public function show(string $entry): JsonResponse
     {
-        return response()->json(['data' => $entry]);
+        $model = KnowledgeEntry::query()->find((int) $entry);
+
+        if ($model === null) {
+            abort(404, 'Запись не найдена.');
+        }
+
+        return response()->json(['data' => $model]);
     }
 
     public function store(Request $request): JsonResponse
@@ -63,7 +73,6 @@ class BrainApiController extends Controller
             'content' => ['required', 'string', 'min:3', 'max:20000'],
             'details' => ['nullable', 'string', 'max:50000'],
             'kind' => ['nullable', 'string', Rule::in(array_keys(KnowledgeKind::options()))],
-            'status' => ['nullable', 'string', Rule::in(array_keys(EntryStatus::options()))],
             'project' => ['nullable', 'string', 'max:128'],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string', 'max:64'],
@@ -81,7 +90,7 @@ class BrainApiController extends Controller
                 importance: (int) ($validated['importance'] ?? 3),
                 confidence: 1.0,
             ),
-            EntryStatus::tryFrom($validated['status'] ?? 'approved') ?? EntryStatus::Approved,
+            null,
             ['engine' => 'api'],
         );
 
@@ -114,7 +123,6 @@ class BrainApiController extends Controller
         return response()->json([
             'data' => [
                 'entries' => KnowledgeEntry::query()->approved()->count(),
-                'drafts' => KnowledgeEntry::query()->where('status', 'draft')->count(),
             ],
         ]);
     }
