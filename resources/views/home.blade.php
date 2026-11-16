@@ -67,7 +67,7 @@
                     <pre id="nb-mcp-json"><code>{
   "mcpServers": {
     "neiro-brain": {
-      "url": "{{ url('/mcp/knowledge') }}",
+      "url": "{{ \App\Support\PublicEndpoint::mcp() }}",
       "description": "Личная база знаний Neiro Brain: поиск карточек, чтение, запись новых знаний.",
       "exposure": "direct"
     }
@@ -91,7 +91,7 @@
             <div class="cmds">
                 <div>
                     <div class="cmd-label">Что произойдёт</div>
-                    <pre><code>1. клиент → POST {{ url('/mcp/knowledge') }}
+                    <pre><code>1. клиент → POST {{ \App\Support\PublicEndpoint::mcp() }}
 2. сервер → 401 + ссылка на авторизацию
 3. браузер → вход в панель → «Разрешить»
 4. клиент → токен → дальше работает сам</code></pre>

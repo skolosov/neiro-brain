@@ -1,6 +1,6 @@
 @php
     $tokenName = trim((string) ($name ?? ''));
-    $mcpUrl = url('/mcp/knowledge');
+    $mcpUrl = \App\Support\PublicEndpoint::mcp();
     $config = json_encode([
         'mcpServers' => [
             'neiro-brain' => [

@@ -33,13 +33,13 @@ class LandingTest extends TestCase
             ->assertSee('Подключённые приложения');
     }
 
-    public function test_config_url_is_built_not_hardcoded(): void
+    public function test_config_url_comes_from_app_url(): void
     {
-        // url() берёт адрес из запроса, поэтому захардкоженный localhost сразу
-        // выдаст себя: страница обязана показывать тот хост, с которого открыта.
+        // Публичный адрес задаётся один раз в APP_URL, а не выводится из того,
+        // откуда открыли страницу: иначе у половины людей в конфиге окажется
+        // 127.0.0.1, который у них не работает.
         $this->get('/')
             ->assertOk()
-            ->assertSee(url('/mcp/knowledge'), false)
-            ->assertDontSee('127.0.0.1/mcp/knowledge', false);
+            ->assertSee(rtrim((string) config('app.url'), '/').'/mcp/knowledge', false);
     }
 }
