@@ -98,6 +98,21 @@ class SkillBootstrapTest extends TestCase
         }
     }
 
+    /**
+     * Токен не должен проходить через агента: он пишется в контекст модели,
+     * в логи провайдера и в переписку. Скилл обязан это запрещать.
+     */
+    public function test_skill_forbids_passing_tokens_through_the_agent(): void
+    {
+        foreach ([resource_path('brain/skill.md'), base_path('docs/skills/brain/SKILL.md')] as $path) {
+            $text = mb_strtolower(File::get($path));
+
+            $this->assertStringContainsString('не проси', $text, $path);
+            $this->assertStringContainsString('не печатай', $text, $path);
+            $this->assertStringContainsString('скопировать конфиг', $text, $path);
+        }
+    }
+
     private function baseUrl(): string
     {
         return rtrim((string) config('app.url'), '/');

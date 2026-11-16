@@ -1,5 +1,16 @@
 @php
     $tokenName = trim((string) ($name ?? ''));
+    $mcpUrl = url('/mcp/knowledge');
+    $config = json_encode([
+        'mcpServers' => [
+            'neiro-brain' => [
+                'url' => $mcpUrl,
+                'headers' => ['Authorization' => 'Bearer '.$plain],
+                'description' => 'Личная база знаний Neiro Brain: поиск карточек, чтение, запись новых знаний.',
+                'exposure' => 'direct',
+            ],
+        ],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 @endphp
 
 <div class="rounded-lg border border-success bg-success/10 px-4 py-3 text-sm">
@@ -20,35 +31,48 @@
                class="min-w-0 flex-1 rounded bg-white px-2 py-1 font-mono text-xs dark:bg-dark-800"
                onclick="this.select()">
         <button type="button" id="nb-copy-token" class="btn btn-primary btn-sm"
-                onclick="nbCopyToken(this)">Скопировать</button>
+                onclick="nbCopyToken('nb-plain-token', this)">Скопировать</button>
     </div>
 
-    <p class="mt-1 text-xs opacity-70">
-        Если кнопка не сработала (браузер запрещает доступ к буферу на http), поле уже выделено —
+    <p class="mt-3 font-semibold">Или сразу готовый конфиг — вставьте его в харнесс:</p>
+    <textarea id="nb-mcp-config" readonly rows="10"
+              class="mt-1 w-full rounded bg-white px-2 py-1 font-mono text-xs dark:bg-dark-800">{{ $config }}</textarea>
+    <div class="mt-2">
+        <button type="button" id="nb-copy-config" class="btn btn-primary btn-sm"
+                onclick="nbCopyToken('nb-mcp-config', this)">Скопировать конфиг</button>
+    </div>
+
+    <p class="mt-2 text-xs opacity-70">
+        Конфиг содержит токен: не пересылайте его в чат, не показывайте агенту и не вставляйте в
+        переписку. Если кнопка не сработала (браузер запрещает буфер на http), поле уже выделено —
         нажмите Ctrl+C или ⌘+C.
     </p>
 </div>
 
 <script>
-    function nbCopyToken(button) {
-        var input = document.getElementById('nb-plain-token');
+    function nbCopyToken(elementId, button) {
+        var field = document.getElementById(elementId);
         var restore = function () {
-            button.textContent = 'Скопировать';
+            button.textContent = button.dataset.label || 'Скопировать';
         };
         var done = function () {
             button.textContent = 'Скопировано';
             window.setTimeout(restore, 2000);
         };
 
+        if (! button.dataset.label) {
+            button.dataset.label = button.textContent;
+        }
+
         if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(input.value).then(done).catch(function () {
-                input.select();
+            navigator.clipboard.writeText(field.value).then(done).catch(function () {
+                field.select();
                 done();
             });
             return;
         }
 
-        input.select();
+        field.select();
         try {
             document.execCommand('copy');
             done();
