@@ -82,6 +82,22 @@ class SkillBootstrapTest extends TestCase
         }
     }
 
+    /**
+     * `/brain` — это не «прочитать протокол», а «сохранить знания сессии»:
+     * так команду задумывал пользователь.
+     */
+    public function test_brain_command_saves_session_knowledge(): void
+    {
+        foreach ([resource_path('brain/skill.md'), base_path('docs/skills/brain/SKILL.md')] as $path) {
+            $text = File::get($path);
+
+            $this->assertStringContainsString('/brain show', $text, $path);
+            $this->assertStringContainsString('remember_many', $text, $path);
+            $this->assertStringContainsString('supersedes', $text, $path);
+            $this->assertStringContainsString('сессии', $text, $path);
+        }
+    }
+
     private function baseUrl(): string
     {
         return rtrim((string) config('app.url'), '/');
