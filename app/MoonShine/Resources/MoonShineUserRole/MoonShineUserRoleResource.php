@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources\MoonShineUserRole;
 
+use App\MoonShine\Concerns\AdminOnlyResource;
 use App\MoonShine\Resources\MoonShineUserRole\Pages\MoonShineUserRoleFormPage;
 use App\MoonShine\Resources\MoonShineUserRole\Pages\MoonShineUserRoleIndexPage;
 use MoonShine\Laravel\Models\MoonshineUserRole;
@@ -22,6 +23,8 @@ use MoonShine\Support\ListOf;
 #[Order(1)]
 class MoonShineUserRoleResource extends ModelResource
 {
+    use AdminOnlyResource;
+
     protected string $model = MoonshineUserRole::class;
 
     protected string $column = 'name';

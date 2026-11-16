@@ -5,8 +5,8 @@ declare(strict_types=1);
 /**
  * Search form and results of the knowledge base.
  *
- * One partial for the cabinet and MoonShine: the form action, the project
- * filter, the kind filter and the topic chips are flags, so the admin page
+ * One partial for the panel's search page and card lists: the form action, the
+ * project filter, the kind filter and the topic chips are flags, so the page
  * keeps what only it has (highlighted snippets, kind filter, topics) without
  * a second copy of the markup.
  *

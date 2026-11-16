@@ -8,7 +8,7 @@
 @endphp
 
 <style>
-    /* Graph page: self-contained so the cabinet and MoonShine share one component. */
+    /* Graph page: self-contained so the graph pages share one component. */
     .brain-graph-page {
         --nb-text: #111827;
         --nb-muted: #6b7280;

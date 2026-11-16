@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\PanelRole;
 use App\Models\User;
+use App\Services\Auth\PanelAccount;
 use App\Support\OwnerResolver;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use MoonShine\Laravel\Models\MoonshineUser;
 
 /**
  * Люди, которые пользуются базой знаний.
  *
- * Регистрации нет: пользователя заводит админ командой. Токены он выпускает
- * сам в кабинете, поэтому команда паролем только задаёт вход.
+ * Регистрации нет: человека заводит команда. Интерфейс один — панель MoonShine,
+ * поэтому команда всегда создаёт (или обновляет) учётную запись панели и
+ * привязывает её к человеку через `moonshine_users.user_id`. С `--admin` роль
+ * администратора, без него — обычный пользователь; пароль один на обе записи.
  */
 class BrainUserCommand extends Command
 {
@@ -24,7 +24,7 @@ class BrainUserCommand extends Command
                             {--email= : Email пользователя}
                             {--name= : Имя}
                             {--password= : Пароль (обязателен при создании)}
-                            {--admin : Сделать администратором MoonShine}
+                            {--admin : Сделать администратором панели}
                             {--create : Только создать, не обновлять существующего}
                             {--list : Показать пользователей}
                             {--disable= : Отключить пользователя по id или email}';
@@ -87,18 +87,23 @@ class BrainUserCommand extends Command
         $user->is_active = true;
         $user->save();
 
-        if ($this->option('admin')) {
-            $this->linkAdmin($user, $password);
-        } elseif ($password !== '') {
-            $this->syncAdminPassword($user, $password);
-        }
+        // Роль меняем только по флагу: сброс пароля без --admin не должен
+        // незаметно отбирать админские права. Новой записи без флага достаётся
+        // роль «Пользователь».
+        $account = app(PanelAccount::class)->sync(
+            $user,
+            $password !== '' ? $password : null,
+            $this->option('admin') ? PanelRole::Admin : null,
+        );
 
         $this->info($existing === null
             ? 'Пользователь создан: '.$user->email
             : 'Пользователь обновлён: '.$user->email);
 
+        $this->line('Вход в панель: /admin/login. Роль: '.PanelRole::fromId($account->moonshine_user_role_id)->label().'.');
+
         if ($password !== '') {
-            $this->line('Пароль задан. Токены для MCP и API выпускаются в кабинете: /app/tokens.');
+            $this->line('Пароль один для базы и панели. Токены выпускаются в панели, раздел «Токены».');
         }
 
         return self::SUCCESS;
@@ -119,6 +124,7 @@ class BrainUserCommand extends Command
 
         $this->info('Пользователь отключён: '.$user->email);
         $this->line('Его токены остаются в базе, но перестают действовать, пока пользователь отключён.');
+        $this->line('Вход в панель закрыт: учётная запись не привязана к активному человеку.');
 
         return self::SUCCESS;
     }
@@ -126,6 +132,7 @@ class BrainUserCommand extends Command
     private function listUsers(): int
     {
         $users = User::query()
+            ->with(['moonshineUser.moonshineUserRole'])
             ->withCount('apiTokens')
             ->orderBy('id')
             ->get();
@@ -136,60 +143,17 @@ class BrainUserCommand extends Command
             return self::SUCCESS;
         }
 
-        $adminIds = DB::table('moonshine_users')
-            ->whereNotNull('user_id')
-            ->pluck('user_id')
-            ->all();
-
         $rows = $users->map(fn (User $user): array => [
             $user->getKey(),
             $user->name,
             $user->email,
             $user->is_active ? 'да' : 'нет',
-            in_array($user->getKey(), $adminIds, true) ? 'да' : '—',
+            $user->moonshineUser?->moonshineUserRole?->name ?? '—',
             $user->api_tokens_count,
         ])->all();
 
-        $this->table(['id', 'Имя', 'Email', 'Активен', 'Админ', 'Токенов'], $rows);
+        $this->table(['id', 'Имя', 'Email', 'Активен', 'Роль', 'Токенов'], $rows);
 
         return self::SUCCESS;
-    }
-
-    private function linkAdmin(User $user, string $password): void
-    {
-        $admin = MoonshineUser::query()->firstOrNew(['email' => $user->email]);
-        $admin->name = $user->name;
-        $admin->moonshine_user_role_id = $admin->moonshine_user_role_id ?: 1;
-
-        // Пароль админки всегда повторяет пароль кабинета: два разных пароля
-        // у одного человека — это гарантированная путаница при входе.
-        $admin->password = $password !== '' ? Hash::make($password) : ($admin->password ?: Hash::make(Str::random(40)));
-
-        $admin->save();
-
-        DB::table('moonshine_users')
-            ->where('id', $admin->getKey())
-            ->update(['user_id' => $user->getKey()]);
-
-        $this->line('Доступ в админку MoonShine: '.$user->email);
-    }
-
-    /**
-     * Уже существующая админка должна принимать тот же пароль, что и кабинет,
-     * даже если команду запускали без --admin.
-     */
-    private function syncAdminPassword(User $user, string $password): void
-    {
-        $updated = DB::table('moonshine_users')
-            ->where('email', $user->email)
-            ->update([
-                'password' => Hash::make($password),
-                'user_id' => $user->getKey(),
-                'updated_at' => now(),
-            ]);
-
-        if ($updated > 0) {
-            $this->line('Пароль админки MoonShine обновлён тем же значением.');
-        }
     }
 }

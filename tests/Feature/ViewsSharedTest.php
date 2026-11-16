@@ -16,11 +16,11 @@ use MoonShine\Laravel\Models\MoonshineUser;
 use Tests\TestCase;
 
 /**
- * Кабинет и админка рисуются одними партиалами.
+ * Интерфейс один — панель MoonShine, и он собирается из общих партиалов.
  *
- * Проверяем три вещи: карточка размечена общим партиалом на обеих страницах
- * поиска, обе страницы живут в обёртке `.brain-ui`, и второй копии разметки
- * карточки (а также старого файла стилей) в репозитории нет.
+ * Проверяем три вещи: страница поиска размечена общим партиалом карточки и
+ * живёт в обёртке `.brain-ui`, проекты рисуются общим списком, а второй копии
+ * разметки карточки (и папки кабинета, которого больше нет) в репозитории нет.
  */
 class ViewsSharedTest extends TestCase
 {
@@ -33,17 +33,6 @@ class ViewsSharedTest extends TestCase
             'email' => 'views@example.test',
             'password' => bcrypt('password'),
             'moonshine_user_role_id' => 1,
-        ]);
-    }
-
-    private function user(): User
-    {
-        return User::query()->create([
-            'name' => 'Человек',
-            'email' => 'views-user@example.test',
-            'password' => 'password',
-            'locale' => 'ru',
-            'is_active' => true,
         ]);
     }
 
@@ -62,36 +51,29 @@ class ViewsSharedTest extends TestCase
         ));
     }
 
-    public function test_search_pages_use_the_same_card_markup_and_wrapper(): void
+    public function test_search_page_uses_the_shared_card_markup_and_wrapper(): void
     {
-        $user = $this->user();
-        $this->writeCard($user, 'Общая карточка');
-
-        $cabinet = $this->actingAs($user)
-            ->get('/app/search')
-            ->assertOk()
-            ->assertSee('Общая карточка')
-            ->assertSee('data-brain-card', false);
+        $this->writeCard($this->owner(), 'Общая карточка');
 
         app(OwnerContext::class)->forget();
 
-        $admin = $this->actingAs($this->admin(), 'moonshine')
+        $response = $this->actingAs($this->admin(), 'moonshine')
             ->get(route('moonshine.page', ['pageUri' => 'search-page']))
             ->assertOk()
             ->assertSee('Общая карточка')
             ->assertSee('data-brain-card', false);
 
-        $this->assertMatchesRegularExpression('/class="[^"]*\bbrain-ui\b[^"]*"/', $cabinet->getContent());
-        $this->assertMatchesRegularExpression('/class="[^"]*\bbrain-ui\b[^"]*"/', $admin->getContent());
+        $this->assertMatchesRegularExpression('/class="[^"]*\bbrain-ui\b[^"]*"/', $response->getContent());
     }
 
     public function test_projects_page_uses_the_shared_project_list(): void
     {
-        $user = $this->user();
-        $this->writeCard($user, 'Карточка проекта');
+        $this->writeCard($this->owner(), 'Карточка проекта');
 
-        $this->actingAs($user)
-            ->get('/app/projects')
+        app(OwnerContext::class)->forget();
+
+        $this->actingAs($this->admin(), 'moonshine')
+            ->get(route('moonshine.page', ['pageUri' => 'projects-page']))
             ->assertOk()
             ->assertSee('neiro-brain')
             ->assertSee('nb-projects-grid', false);
@@ -99,6 +81,9 @@ class ViewsSharedTest extends TestCase
 
     public function test_card_markup_is_defined_in_one_shared_partial(): void
     {
+        // Кабинета больше нет: его представления не должны вернуться.
+        $this->assertDirectoryDoesNotExist(resource_path('views/app'));
+
         $this->assertFileDoesNotExist(resource_path('views/moonshine/brain/styles.blade.php'));
         $this->assertFileDoesNotExist(resource_path('views/moonshine/brain/partials/knowledge-card.blade.php'));
         $this->assertFileDoesNotExist(resource_path('views/moonshine/brain/partials/entry-panel.blade.php'));

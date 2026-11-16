@@ -32,7 +32,7 @@ class UserIndexPage extends IndexPage
             Text::make('Локаль', 'locale'),
             Text::make('Активен', 'is_active')
                 ->modifyRawValue(fn (mixed $value): string => $value ? 'да' : 'нет'),
-            Text::make('Админка (moonshine_users)', 'admin_email'),
+            Text::make('Вход в панель (moonshine_users)', 'admin_email'),
         ];
     }
 

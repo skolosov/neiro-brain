@@ -3,8 +3,8 @@
 ## Слои
 
 ```
-Вход            MCP /mcp/knowledge   HTTP /api/v1/*   Кабинет /app   Админка /admin
-Личность        VerifyBrainToken     VerifyBrainToken SetOwnerFromAuth  (сессия MoonShine)
+Вход            MCP /mcp/knowledge   HTTP /api/v1/*   Админка /admin (вход /admin/login)
+Личность        VerifyBrainToken     VerifyBrainToken SetOwnerFromPanel (сессия MoonShine)
 Владелец        OwnerContext (scoped) ────────────────────────────────────────────────
 Сервисы         KnowledgeSearch, Bm25Search, KnowledgeWriter, ProjectContext,
                 Indexer, SecretMasker, InstructionsBuilder, TokenIssuer
@@ -16,8 +16,7 @@
 |---|---|---|
 | MCP | Инструменты, ресурсы, промпт, динамические `instructions` | `app/Mcp/*` |
 | API | Поиск, карточки, проекты, статистика | `app/Http/Controllers/Api/BrainApiController.php` |
-| Кабинет | Свои карточки, проекты, граф, токены, профиль | `app/Http/Controllers/App/*` |
-| Админка | Все карточки, люди, токены, настройки | `app/MoonShine/*` |
+| Панель | Единственный интерфейс: свои карточки и токены, у админа — всё | `app/MoonShine/*` |
 | Токены | Выпуск `nb-…`, SHA-256, способности `read`/`write` | `app/Services/Auth/TokenIssuer.php`, `app/Models/ApiToken.php` |
 | Владелец | Контекст запроса, `fail-closed` | `app/Support/OwnerContext.php` |
 | Запись | Маскировка, дедуп по `(owner_id, content_hash)`, замена версий | `app/Services/Brain/KnowledgeWriter.php` |
@@ -40,8 +39,11 @@
   где он известен явно (дедуп, поиск по id в API, команды), есть
   `scopeOwnedBy()` — лучше сказать это вслух, чем полагаться на невидимое
   состояние контейнера.
-- `POST /api/v1/entries`, `GET /api/v1/entries/{id}` и кабинет поэтому отдают 404
+- `POST /api/v1/entries`, `GET /api/v1/entries/{id}` и панель поэтому отдают 404
   на чужой id, а не 403: чужая карточка неотличима от несуществующей.
+- В панели роль решает, что видно: `SetOwnerFromPanel` ставит владельца обычному
+  человеку и оставляет контекст пустым администратору. Ресурсы «Люди»,
+  «Администраторы», «Роли» и страница «Настройки» закрыты ролью администратора.
 
 ## Модель данных
 

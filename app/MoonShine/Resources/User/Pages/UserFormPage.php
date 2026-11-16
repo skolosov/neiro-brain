@@ -35,9 +35,9 @@ class UserFormPage extends FormPage
                     ->default('ru')
                     ->required(),
                 Switcher::make('Активен', 'is_active')->default(true),
-                Text::make('Админка MoonShine', 'admin_email')
+                Text::make('Вход в панель', 'admin_email')
                     ->readonly()
-                    ->hint('Связь moonshine_users.user_id. Заполняется командой brain:user --admin.'),
+                    ->hint('Связь moonshine_users.user_id. Заполняется сама при создании и командой brain:user.'),
                 Password::make('Пароль', 'password')
                     ->eye()
                     ->hint('Оставьте пустым при создании — сгенерируем и покажем один раз. При правке пустое поле не меняет пароль.'),

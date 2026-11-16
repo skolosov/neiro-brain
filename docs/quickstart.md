@@ -8,8 +8,8 @@
 | Что | Значение |
 |---|---|
 | Папка проекта | `C:\OSPanel65\home\neiro-brain` |
-| Кабинет | `http://neiro-brain.local/app` |
-| Админка | `http://neiro-brain.local/admin` (из сети — `http://192.168.0.107/`, снаружи — `http://95.79.97.24:7777/`) |
+| Панель (единственный интерфейс) | `http://neiro-brain.local/admin` (из сети — `http://192.168.0.107/`, снаружи — `http://95.79.97.24:7777/`) |
+| Вход в панель | `http://neiro-brain.local/admin/login` |
 | MCP | `http://neiro-brain.local/mcp/knowledge` (streamable-http) |
 | HTTP API | `http://neiro-brain.local/api/v1/*` |
 | Логи | `storage\logs\laravel.log` |
@@ -46,7 +46,7 @@ php artisan key:generate
 php artisan migrate
 ```
 
-`APP_URL` должен совпадать с доменом, иначе ссылки в кабинете и админке будут
+`APP_URL` должен совпадать с доменом, иначе ссылки в админке будут
 неверными. Домен, порты и расширения PHP — в [openserver.md](openserver.md).
 Docker на macOS — в [docker-macos.md](docker-macos.md).
 
@@ -66,15 +66,16 @@ php artisan brain:user --email=owner@example.com --name="Владелец" --pas
 php artisan brain:user --list
 php artisan brain:user --email=owner@example.com --name="Новое имя"   # обновить
 php artisan brain:user --disable=owner@example.com                    # отключить
-php artisan brain:user --admin                                        # доступ в MoonShine
+php artisan brain:user --admin                                        # роль администратора панели
 ```
 
-Пароль нужен только для входа в кабинет. Токены человек выпускает сам.
+Команда создаёт и человека, и учётную запись панели: пароль один, без `--admin`
+роль «Пользователь», с `--admin` — администратор. Токены человек выпускает сам.
 
 ## Шаг 3. Выпустить личный токен
 
-1. Открыть `http://neiro-brain.local/app` и войти email + паролем.
-2. **Токены → Выпустить**: имя, способности `read` или `read + write`.
+1. Открыть `http://neiro-brain.local/admin/login` и войти email + паролем.
+2. **Токены → Создать**: имя, способности `read` или `read + write`.
 3. Скопировать `nb-…` — значение показывается один раз, в базе лежит только
    SHA-256.
 
@@ -193,7 +194,7 @@ curl -sS http://neiro-brain.local/mcp/knowledge \
 > Что ты знаешь о моём стеке?
 
 Агент вызовет `remember_many`, затем `search_knowledge`. Карточка появится в
-кабинете (`/app/search`) и в админке (`/admin`). То же через API:
+панели: раздел «Знания» (`/admin`) и страница «Поиск». То же через API:
 
 ```bash
 curl -X POST http://neiro-brain.local/api/v1/entries \
@@ -202,18 +203,20 @@ curl -X POST http://neiro-brain.local/api/v1/entries \
   -d '{"title":"Стиль кода","content":"Пользователь пишет тесты на PHPUnit.","kind":"style"}'
 ```
 
-## Как искать в кабинете
+## Как искать в панели
 
 | Страница | Для чего |
 |---|---|
-| **Обзор** | профиль, выпущенные токены и их последнее использование |
+| **Обзор** | сколько карточек, темы, проекты и свежие записи |
 | **Поиск** | BM25 по своим карточкам; пустой запрос — последние |
-| **Карточка** | полный текст, теги, история версий через `superseded_by` |
+| **Знания** | список своих карточек с историей версий через `superseded_by` |
 | **Граф** | проекты → темы → карточки |
 | **Проекты** | проекты и число карточек в каждом |
+| **Токены** | свои токены: выпуск и отзыв |
 
-Карточки в кабинете только читаются: исправления формулируются агенту, он
-вызывает `remember_many`/`delete_knowledge`.
+Карточки в панели у обычного человека только свои и только читаются: исправления
+формулируются агенту, он вызывает `remember_many`/`delete_knowledge`.
+Администратор видит все карточки, людей и настройки.
 
 ## Частые ошибки
 

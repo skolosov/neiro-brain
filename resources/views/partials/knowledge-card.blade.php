@@ -9,9 +9,8 @@ declare(strict_types=1);
  * row carries only what helps recognition — theme, title, the summary cut to a
  * single line — and nothing that repeats what the eye already sees.
  *
- * The same row is rendered by the cabinet and by MoonShine, so the link is a
- * parameter: the caller decides whether it opens `/app/entries/{id}` or the
- * admin card page.
+ * The row is rendered by the panel's search page and its card lists, so the link
+ * is a parameter: the caller decides where it opens.
  *
  * @var array<string, mixed> $entry
  * @var string $url

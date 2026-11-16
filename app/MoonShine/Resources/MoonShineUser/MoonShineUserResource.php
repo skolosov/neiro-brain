@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources\MoonShineUser;
 
+use App\MoonShine\Concerns\AdminOnlyResource;
 use App\MoonShine\Resources\MoonShineUser\Pages\MoonShineUserFormPage;
 use App\MoonShine\Resources\MoonShineUser\Pages\MoonShineUserIndexPage;
 use MoonShine\Laravel\Models\MoonshineUser;
@@ -22,6 +23,8 @@ use MoonShine\Support\ListOf;
 #[Order(0)]
 class MoonShineUserResource extends ModelResource
 {
+    use AdminOnlyResource;
+
     protected string $model = MoonshineUser::class;
 
     protected string $column = 'name';

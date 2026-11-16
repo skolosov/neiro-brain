@@ -9,6 +9,7 @@ use App\Enums\KnowledgeKind;
 use App\Models\User;
 use App\MoonShine\Resources\KnowledgeEntry\KnowledgeEntryResource;
 use App\MoonShine\Resources\User\UserResource;
+use App\Support\PanelAccess;
 use MoonShine\Laravel\Fields\Relationships\BelongsTo;
 use MoonShine\Laravel\Pages\Crud\IndexPage;
 use MoonShine\UI\Fields\Enum;
@@ -26,14 +27,21 @@ class KnowledgeEntryIndexPage extends IndexPage
 
     protected function fields(): iterable
     {
-        return [
-            ID::make()->sortable(),
-            BelongsTo::make(
+        $fields = [ID::make()->sortable()];
+
+        // Колонка владельца имеет смысл, только когда видно чужие карточки:
+        // у обычного человека в списке лишь его собственные строки.
+        if (PanelAccess::isAdmin()) {
+            $fields[] = BelongsTo::make(
                 'Владелец',
                 'owner',
                 formatted: static fn (User $user): string => (string) $user->name,
                 resource: UserResource::class,
-            ),
+            );
+        }
+
+        return [
+            ...$fields,
             Text::make('Заголовок', 'title'),
             Enum::make('Тип', 'kind')
                 ->attach(KnowledgeKind::class)
@@ -49,7 +57,7 @@ class KnowledgeEntryIndexPage extends IndexPage
 
     protected function filters(): iterable
     {
-        return [
+        $filters = [
             Enum::make('Тип', 'kind')
                 ->attach(KnowledgeKind::class)
                 ->nullable(),
@@ -57,9 +65,15 @@ class KnowledgeEntryIndexPage extends IndexPage
                 ->attach(EntryStatus::class)
                 ->nullable(),
             Text::make('Проект', 'project')->nullable(),
-            Select::make('Владелец', 'owner_id')
-                ->options(User::query()->orderBy('name')->pluck('name', 'id')->all())
-                ->nullable(),
         ];
+
+        // Список людей в фильтре — это чужие имена, обычному человеку они не нужны.
+        if (PanelAccess::isAdmin()) {
+            $filters[] = Select::make('Владелец', 'owner_id')
+                ->options(User::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->nullable();
+        }
+
+        return $filters;
     }
 }

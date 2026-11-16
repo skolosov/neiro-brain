@@ -53,7 +53,7 @@ class BrainSkillCommand extends Command
         File::copy($source, $target);
 
         $this->info('Скилл /brain установлен: '.$target);
-        $this->line('Для работы нужен MCP-сервер neiro-brain и личный токен из кабинета (/app/tokens).');
+        $this->line('Для работы нужен MCP-сервер neiro-brain и личный токен из панели (/admin, раздел «Токены»).');
 
         return self::SUCCESS;
     }

@@ -73,6 +73,12 @@ class SearchPage extends Page
                 ? KnowledgeEntry::query()->find($result['cards'][0]['id'])
                 : null);
 
+        // Чужой (или уже удалённый) id карточки не открывается ни в каком виде:
+        // вместо пустой панели — честный 404.
+        if ($entryId > 0 && ! $entry instanceof KnowledgeEntry) {
+            abort(404);
+        }
+
         $selected = $entry instanceof KnowledgeEntry ? $cardSearch->cardFor($entry) : null;
 
         $related = $entry instanceof KnowledgeEntry

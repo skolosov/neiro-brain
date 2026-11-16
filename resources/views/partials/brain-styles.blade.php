@@ -1,11 +1,10 @@
 {{--
     Единый файл стилей базы знаний.
 
-    Всё живёт под обёрткой `.brain-ui`: в кабинете это контент страницы, в
-    админке — страницы MoonShine. Поэтому правила не протекают в оболочку
-    MoonShine и обратно. Палитра включается по контексту: `brain-ui-dark` —
-    тёмный кабинет, `.dark` — тёмная тема MoonShine. Набор переменных один,
-    чтобы карточка, панель и поиск выглядели одинаково в обоих местах.
+    Всё живёт под обёрткой `.brain-ui`: это контент страниц панели MoonShine.
+    Поэтому правила не протекают в оболочку MoonShine и обратно. Палитра
+    включается по контексту: `.dark` — тёмная тема MoonShine. Набор переменных
+    один, чтобы карточка, панель и поиск выглядели одинаково.
 --}}
 <style>
     .brain-ui {
@@ -329,27 +328,4 @@
     .brain-ui .nb-atom-text { font-size: .82rem; line-height: 1.45; color: var(--nb-text); }
     .brain-ui .nb-atoms-more { font-size: .75rem; }
     .brain-ui .nb-atoms-more a { color: var(--nb-accent); }
-
-    /* Tokens (cabinet shares these classes through the layout) */
-    .brain-ui .nb-token {
-        border: 1px solid var(--nb-border);
-        border-radius: .6rem;
-        padding: .8rem .9rem;
-        margin-bottom: .75rem;
-        background: var(--nb-accent-soft);
-    }
-    .brain-ui .nb-token-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
-    .brain-ui .nb-token-value code {
-        display: inline-block;
-        max-width: 100%;
-        padding: .25rem .55rem;
-        border-radius: .4rem;
-        background: var(--nb-card);
-        border: 1px solid var(--nb-border);
-        color: var(--nb-text);
-        font-size: .82rem;
-        word-break: break-all;
-    }
-    .brain-ui .nb-token-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
-    .brain-ui .nb-token-actions .nb-btn { padding: .4rem .8rem; font-size: .78rem; }
 </style>

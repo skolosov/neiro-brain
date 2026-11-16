@@ -10,13 +10,23 @@ use App\Settings\RetrievalSettings;
 use App\Settings\RulesSettings;
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
+use App\Support\PanelAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
+/**
+ * Действия администратора базы знаний.
+ *
+ * Маршруты живут вне панели MoonShine, но доступны только администратору: у
+ * обычного человека настроек и переиндексации нет, даже если он отправит POST
+ * по адресу руками.
+ */
 class BrainAdminController extends Controller
 {
     public function reindex(Indexer $indexer): RedirectResponse
     {
+        $this->ensureAdmin();
+
         $count = $indexer->indexAll();
 
         return back()->with('brain_status', sprintf('Переиндексировано записей: %d.', $count));
@@ -24,6 +34,8 @@ class BrainAdminController extends Controller
 
     public function updateSettings(Request $request): RedirectResponse
     {
+        $this->ensureAdmin();
+
         app(SettingsInitializer::class)->ensure();
 
         $validated = $request->validate([
@@ -68,5 +80,10 @@ class BrainAdminController extends Controller
         $text = trim((string) $value);
 
         return $text === '' ? null : $text;
+    }
+
+    private function ensureAdmin(): void
+    {
+        abort_unless(PanelAccess::isAdmin(), 403, 'Настройки базы знаний доступны только администратору.');
     }
 }

@@ -6,9 +6,9 @@ declare(strict_types=1);
  * Cards screen of the admin: the search form, the list of cards and the panel
  * of the open card.
  *
- * The markup itself is shared with the cabinet: `partials.search-results`
+ * The markup itself is shared with the search page: `partials.search-results`
  * draws the form and the list, `partials.entry-panel` draws the open card.
- * Only the data and the URLs are the admin's own — the card page lives in
+ * Only the data and the URLs are the page's own — the card page lives in
  * MoonShine, so every link is passed in instead of being built here.
  *
  * @var array<string, mixed> $result

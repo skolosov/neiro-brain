@@ -6,8 +6,8 @@ declare(strict_types=1);
  * The quiet footer of a card: only what a reader might click. No type labels —
  * "ТЕГ" or "ГРАФ" next to a word says less than the word itself.
  *
- * Both screens pass their own links, so the partial never builds a route:
- * in the cabinet they point to `/app/entries/{id}`, in MoonShine to its pages.
+ * The caller passes its own links, so the partial never builds a route: the
+ * panel supplies MoonShine page addresses.
  *
  * @var list<array{label: string, url: string}> $links
  * @var string|null $title

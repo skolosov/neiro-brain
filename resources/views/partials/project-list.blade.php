@@ -3,13 +3,12 @@
 declare(strict_types=1);
 
 /**
- * Projects of the knowledge base: one card per project, shared by the cabinet
- * and MoonShine.
+ * Projects of the knowledge base: one card per project, shared by the panel's
+ * projects page and the overview.
  *
  * The caller normalizes its own data: `name`, `count`, `url` are required;
  * `topics`, `topicUrl`, `importance`, `last` and `graphUrl` are optional, so
- * the admin keeps its topic chips and graph link while the cabinet shows the
- * same card without them.
+ * a page can keep its topic chips and graph link or drop them.
  *
  * @var list<array{name: string, count: int, url: string, topics?: array<string, int>, topicUrl?: callable(string): string, importance?: int|null, last?: string|null, graphUrl?: string|null}> $projects
  * @var string|null $emptyTitle

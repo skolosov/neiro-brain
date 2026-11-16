@@ -8,6 +8,7 @@ use App\Settings\RetrievalSettings;
 use App\Settings\RulesSettings;
 use App\Settings\SecuritySettings;
 use App\Settings\SettingsInitializer;
+use App\Support\PanelAccess;
 use Illuminate\Contracts\Support\Renderable;
 use MoonShine\Laravel\Pages\Page;
 use MoonShine\MenuManager\Attributes\Group;
@@ -23,6 +24,19 @@ class SettingsPage extends Page
     public function getTitle(): string
     {
         return 'Настройки';
+    }
+
+    /**
+     * Настройки базы — администраторские: обычному человеку страница закрыта,
+     * даже если он введёт адрес руками.
+     */
+    protected function prepareBeforeRender(): void
+    {
+        if (! PanelAccess::isAdmin()) {
+            $this->throw403();
+        }
+
+        parent::prepareBeforeRender();
     }
 
     /**

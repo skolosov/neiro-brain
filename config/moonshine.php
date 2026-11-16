@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\SetOwnerFromPanel;
 use App\MoonShine\Layouts\MoonShineLayout;
+use App\MoonShine\Pages\Dashboard;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
@@ -76,6 +78,8 @@ return [
         'model' => MoonshineUser::class,
         'middleware' => [
             Authenticate::class,
+            // Владелец знаний для панели: админ видит всё, обычный человек — своё.
+            SetOwnerFromPanel::class,
         ],
         'pipelines' => [],
     ],
@@ -98,7 +102,7 @@ return [
     ],
 
     'pages' => [
-        'dashboard' => App\MoonShine\Pages\Dashboard::class,
+        'dashboard' => Dashboard::class,
         'profile' => ProfilePage::class,
         'login' => LoginPage::class,
         'error' => ErrorPage::class,

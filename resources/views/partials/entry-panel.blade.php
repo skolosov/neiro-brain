@@ -3,13 +3,12 @@
 declare(strict_types=1);
 
 /**
- * One entry read as a document: the panel of the search page and the whole
- * cabinet card page.
+ * One entry read as a document: the side panel of the panel's search page.
  *
  * Same content as the list row, just complete — no duplicated metadata blocks
  * and no per-sentence labels. Everything the panel links to is a parameter:
  * actions, tags and neighbouring cards carry their own URLs, so the partial
- * knows nothing about cabinet or MoonShine routes.
+ * knows nothing about MoonShine routes.
  *
  * @var array<string, mixed> $entry
  * @var list<array{label: string, url: string}> $related

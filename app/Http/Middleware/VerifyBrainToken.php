@@ -48,7 +48,7 @@ class VerifyBrainToken
         if ($this->isDevToken($plain)) {
             if (! $this->devAllowed($request)) {
                 return $this->unauthorized(
-                    'Дев-токен работает только на localhost при APP_ENV=local. Выпустите личный токен в кабинете.',
+                    'Дев-токен работает только на localhost при APP_ENV=local. Выпустите личный токен в панели.',
                 );
             }
 
@@ -68,13 +68,13 @@ class VerifyBrainToken
 
         if ($token === null) {
             return $this->unauthorized(
-                'Токен не подошёл. Проверьте значение или выпустите новый в кабинете: /app/tokens.',
+                'Токен не подошёл. Проверьте значение или выпустите новый в панели: /admin, раздел «Токены».',
             );
         }
 
         if ($token->isExpired()) {
             return $this->unauthorized(
-                'Срок действия токена истёк. Выпустите новый в кабинете: /app/tokens.',
+                'Срок действия токена истёк. Выпустите новый в панели: /admin, раздел «Токены».',
             );
         }
 
@@ -92,7 +92,7 @@ class VerifyBrainToken
                     'type' => 'authorization_error',
                     'code' => 'insufficient_ability',
                     'message' => $required === 'write'
-                        ? 'У токена нет права write: этим токеном можно только читать. Выпустите токен с правом записи в кабинете.'
+                        ? 'У токена нет права write: этим токеном можно только читать. Выпустите токен с правом записи в панели.'
                         : 'У токена нет права read.',
                 ],
             ], 403);
