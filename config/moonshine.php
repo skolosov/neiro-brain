@@ -109,9 +109,12 @@ return [
     ],
 
     // Localizations
-    'locale' => 'en',
+    // Панель русская: подписи MoonShine лежат в lang/vendor/moonshine/ru.
+    // Ключ => название нужно для переключателя в шапке; локаль приложения
+    // (config/app.php) не трогаем — ChangeLocale меняет её только на запросах панели.
+    'locale' => 'ru',
     'locale_key' => ChangeLocale::KEY,
     'locales' => [
-        // en
+        'ru' => 'Русский',
     ],
 ];
