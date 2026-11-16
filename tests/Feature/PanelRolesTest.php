@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\KnowledgeKind;
 use App\Enums\KnowledgeScope;
 use App\Enums\PanelRole;
+use App\Models\ApiToken;
 use App\Models\KnowledgeEntry;
 use App\Models\User;
 use App\Services\Auth\TokenIssuer;
@@ -356,8 +357,32 @@ class PanelRolesTest extends TestCase
         $this->assertDatabaseMissing('api_tokens', ['id' => $own['token']->getKey()]);
     }
 
-    /** Администратор не выпускает токены: это личное дело человека. */
-    public function test_admin_cannot_issue_tokens(): void
+    /**
+     * Администратор — тоже человек: он выпускает свои токены и может иметь их
+     * несколько (ноутбук, сервер, второй харнесс).
+     */
+    public function test_admin_issues_several_tokens_for_self(): void
+    {
+        $person = $this->user('admin-person@panel.test');
+        $account = $this->admin();
+        $account->forceFill(['user_id' => $person->getKey()])->save();
+
+        foreach (['Ноутбук', 'Сервер'] as $name) {
+            $this->actingAs($account, 'moonshine')
+                ->post(route('moonshine.crud.store', ['resourceUri' => 'api-token-resource']), [
+                    'name' => $name,
+                    'abilities' => ['read', 'write'],
+                ])
+                ->assertRedirect();
+        }
+
+        $this->assertSame(2, ApiToken::query()->where('user_id', $person->getKey())->count());
+        $this->assertDatabaseHas('api_tokens', ['name' => 'Ноутбук', 'user_id' => $person->getKey()]);
+        $this->assertDatabaseHas('api_tokens', ['name' => 'Сервер', 'user_id' => $person->getKey()]);
+    }
+
+    /** Служебная учётка без человека токенов не выпускает: выдавать некому. */
+    public function test_admin_without_linked_person_cannot_issue_tokens(): void
     {
         $this->actingAs($this->admin(), 'moonshine')
             ->post(route('moonshine.crud.store', ['resourceUri' => 'api-token-resource']), [

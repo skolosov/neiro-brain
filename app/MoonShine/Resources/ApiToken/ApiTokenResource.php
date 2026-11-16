@@ -60,11 +60,12 @@ class ApiTokenResource extends ModelResource
 
     protected function activeActions(): ListOf
     {
-        // Выпуск — только у человека: у администратора нет своего владельца,
-        // поэтому ему доступен лишь просмотр и отзыв.
-        return PanelAccess::isAdmin()
-            ? parent::activeActions()->only(Action::DELETE)
-            : parent::activeActions()->only(Action::CREATE, Action::DELETE);
+        // Выпуск доступен всем, у кого есть свой человек в базе: и обычному
+        // пользователю, и администратору. Администратор без связки с человеком
+        // (служебная учётка) не выпускает ничего — ему некому выдать токен.
+        return PanelAccess::ownerId() !== null
+            ? parent::activeActions()->only(Action::CREATE, Action::DELETE)
+            : parent::activeActions()->only(Action::DELETE);
     }
 
     protected function pages(): array

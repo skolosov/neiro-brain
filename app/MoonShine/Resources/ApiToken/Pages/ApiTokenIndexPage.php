@@ -48,13 +48,19 @@ class ApiTokenIndexPage extends IndexPage
      */
     protected function topLayer(): array
     {
+        $hint = FlexibleRender::make(fn (): string => '<p class="nb-peek-text" style="margin:0 0 .6rem">'
+            .'Токенов может быть сколько угодно: по одному на ноутбук, сервер или харнесс. '
+            .'Плейн <code>nb-…</code> показывается один раз, в базе лежит только хэш; '
+            .'отзыв — кнопка «Отозвать», он действует сразу.</p>');
+
         $plain = session('plain_token');
 
         if (! is_string($plain) || $plain === '') {
-            return parent::topLayer();
+            return [$hint, ...parent::topLayer()];
         }
 
         return [
+            $hint,
             FlexibleRender::make(fn (): string => view('moonshine.brain.token-issued', [
                 'plain' => $plain,
                 'name' => (string) session('plain_token_name', ''),
